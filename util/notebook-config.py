@@ -1,32 +1,38 @@
 # Databricks notebook source
-# DBTITLE 1,Kafka config - see the RUNME notebook for instructions on setting up secrets
-kafka_bootstrap_servers = dbutils.secrets.get("solution-accelerator-cicd", "iot-anomaly-kafka-bootstrap-server")
-security_protocol = "SASL_SSL"
-sasl_mechanism = "PLAIN"
-sasl_username = dbutils.secrets.get("solution-accelerator-cicd", "iot-anomaly-sasl-username")
-sasl_password = dbutils.secrets.get("solution-accelerator-cicd", "iot-anomaly-sasl-password")
-topic = "iot_msg_topic"
-sasl_config = f'org.apache.kafka.common.security.plain.PlainLoginModule required username="{sasl_username}" password="{sasl_password}";'
+dbutils.widgets.text('catalog name','omics_demo')
+dbutils.widgets.text('schema name','tcga')
 
 # COMMAND ----------
 
-# DBTITLE 1,Streaming checkpoint location
-checkpoint_path = "/dbfs/tmp/iot-anomaly-detection/checkpoints"
+# DBTITLE 1,Setup paths
+user=sql('select current_user() as user').collect()[0].user
+
+staging_path=f"/home/{user}/genomics/data/tcga1/staging"
+expression_files_path = f"{staging_path}/expressions"
+
+catalog_name = dbutils.widgets.get('catalog name')
+schema_name = dbutils.widgets.get('schema name')
 
 # COMMAND ----------
 
-# DBTITLE 1,Database settings
-database = "rvp_iot_sa"
-
-spark.sql(f"create database if not exists {database}")
+# DBTITLE 1,create paths if don't exist
+dbutils.fs.mkdirs(staging_path)
+dbutils.fs.mkdirs(expression_files_path)
 
 # COMMAND ----------
 
-# DBTITLE 1,mlflow settings
-import mlflow
-model_name = "iot_anomaly_detection_xgboost"
-username = dbutils.notebook.entry_point.getDbutils().notebook().getContext().userName().get()
-mlflow.set_experiment('/Users/{}/iot_anomaly_detection'.format(username))
+# DBTITLE 1,create configs
+configs = {'paths':{'staging_path':staging_path,'expression_files_path':expression_files_path},'catalog':{'ctalog_name':catalog_name,'schema_name':schema_name}}  
+
+# COMMAND ----------
+
+import json
+with open('configs.json', 'w') as f:
+    json.dump(configs, f)
+
+# COMMAND ----------
+
+displayHTML(f"Configurations:<br>Staging Path: {staging_path}<br>Expression Profiles: {expression_files_path}<br>Catalog Name: {catalog_name}<br>Schema Name: {schema_name}")
 
 # COMMAND ----------
 

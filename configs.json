@@ -1,0 +1,1 @@
+{"paths": {"staging_path": "/home/amir.kermany@databricks.com/genomics/data/tcga1/staging", "expression_files_path": "/home/amir.kermany@databricks.com/genomics/data/tcga1/staging/expressions"}, "catalog": {"ctalog_name": "omics_demo", "schema_name": "tcga"}}

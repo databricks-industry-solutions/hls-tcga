@@ -1,7 +1,7 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC ## Delta Live Table (DLT)
-# MAGIC In this notebook we show how you can preform the tasks in [01-tcga-etl]("$./01-tcga-etl") using [Delta Live Tables](https://www.databricks.com/product/delta-live-tables)
+# MAGIC In this notebook we show how you can preform the tasks in [01-tcga-etl](https://github.com/databricks-industry-solutions/hls-tcga/blob/main/01-tcga-etl.py) using [Delta Live Tables](https://www.databricks.com/product/delta-live-tables)
 
 # COMMAND ----------
 

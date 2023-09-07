@@ -70,35 +70,79 @@ job_json = {
             {
                 "job_cluster_key": "tcga_solacc_cluster",
                 "notebook_task": {
-                    "notebook_path": f"00-data-download"
+                    "notebook_path": f"00-README"
                 },
-                "task_key": "tcga_01"
+                "task_key": "tcga_rm_000",
+                "run_if": "ALL_SUCCESS"
             },
             {
                 "job_cluster_key": "tcga_solacc_cluster",
                 "notebook_task": {
-                    "notebook_path": f"00-tcga-data-prep"
+                    "notebook_path": f"util/notebook-config"
                 },
-                "task_key": "tcga_solacc_01"
+                "task_key": "tcga_conf_000",
+                "run_if": "ALL_SUCCESS"
             },
-            # {
-            #     "job_cluster_key": "sample_solacc_cluster",
-            #     "notebook_task": {
-            #         "notebook_path": f"02_Analysis"
-            #     },
-            #     "task_key": "sample_solacc_02",
-            #     "depends_on": [
-            #         {
-            #             "task_key": "sample_solacc_01"
-            #         }
-            #     ]
-            # }
+            
+            {
+                "job_cluster_key": "tcga_solacc_cluster",
+                "notebook_task": {
+                    "notebook_path": f"00-data-download"
+                },
+                "task_key": "tcga_00",
+                "run_if": "ALL_SUCCESS",
+                "depends_on": [
+                    {
+                        "task_key": "tcga_conf_000"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "tcga_solacc_cluster",
+                "notebook_task": {
+                    "notebook_path": f"01-tcga-etl"
+                },
+                "task_key": "tcga_01",
+                "run_if": "ALL_SUCCESS",
+                "depends_on": [
+                    {
+                        "task_key": "tcga_00"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "tcga_solacc_cluster",
+                "notebook_task": {
+                    "notebook_path": f"02-tcga-analysis"
+                },
+                "task_key": "tcga_02",
+                "run_if": "ALL_SUCCESS",
+                "depends_on": [
+                    {
+                        "task_key": "tcga_01"
+                    }
+                ]
+            },
+            {
+                "job_cluster_key": "tcga_solacc_cluster",
+                "notebook_task": {
+                    "notebook_path": f"03-tcga-expression-profiles"
+                },
+                "task_key": "tcga_03",
+                "run_if": "ALL_SUCCESS",
+                "depends_on": [
+                    {
+                        "task_key": "tcga_01"
+                    }
+                ]
+            },
+            
         ],
         "job_clusters": [
             {
-                "job_cluster_key": "sample_solacc_cluster",
+                "job_cluster_key": "tcga_solacc_cluster",
                 "new_cluster": {
-                    "spark_version": "11.3.x-cpu-ml-scala2.12",
+                    "spark_version": "13.0.x-scala2.12",
                 "spark_conf": {
                     "spark.databricks.delta.formatCheck.enabled": "false"
                     },

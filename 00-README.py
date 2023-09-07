@@ -4,7 +4,7 @@
 # MAGIC
 # MAGIC  <img src="https://www.cancer.gov/ccg/sites/g/files/xnrzdm256/files/styles/cgov_featured/public/cgov_image/media_image/2022-06/TCGA%20people%20and%20layers%20of%20data%20425x319.jpg?h=982f41e1&itok=zkQ_l8-t" width=200 >
 # MAGIC  
-# MAGIC The Cancer Genome Atlas (TCGA) is a comprehensive and coordinated effort to accelerate our understanding of the molecular basis of cancer through the application of genome analysis technologies, including large-scale genome sequencing. TCGA was launched in 2006 by the National Cancer Institute (NCI) and National Human Genome Research Institute (NHGRI).
+# MAGIC [The Cancer Genome Atlas (TCGA)](https://www.cancer.gov/ccg/research/genome-sequencing/tcga) is a comprehensive and coordinated effort to accelerate our understanding of the molecular basis of cancer through the application of genome analysis technologies, including large-scale genome sequencing. TCGA was launched in 2006 by the [National Cancer Institute (NCI)](https://www.nih.gov/about-nih/what-we-do/nih-almanac/national-cancer-institute-nci)] and [National Human Genome Research Institute (NHGRI)](https://www.genome.gov/).
 # MAGIC
 # MAGIC The goals of TCGA are:
 # MAGIC 1. Improve our ability to diagnose, treat and prevent cancer. By better understanding the genomic changes involved in cancer, we can develop more effective diagnostic and treatment approaches.

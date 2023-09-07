@@ -3,21 +3,44 @@
 # MAGIC # Expression Profile Clustering
 # MAGIC
 # MAGIC In this notebook, we explore expression profiles for each sample and inspect clusters of samples.
-# MAGIC To do so, we select a subset of genenes with highest variablity accross all samples and use [UMAP](https://umap-learn.readthedocs.io/en/latest/) for dimensionality reduction to reduce the number of features to 2 for visual inspection.
-# MAGIC We then interactively label each sample on the 2-plot based on different clinical features.
+# MAGIC To do so, we select a subset of genes with the highest variability across all samples and use [UMAP](https://umap-learn.readthedocs.io/en/latest/) for dimensionality reduction, reducing the number of features to 2 for visual inspection.
+# MAGIC We then interactively label each sample on the 2D plot based on different clinical features.
 # MAGIC
 # MAGIC [![](https://mermaid.ink/img/pako:eNplk11v2jAUhv_KkSeUG1rRrtXWXEyCANvFQNM-ehNXkYlPUkv-iGynowL--04SKFSLosQ-53nfcxLbO1Y6iSxlo9GOWwBlVUyhHwIk8RkNJikkGxEwGV9GH4VXYqMxJG84pRqvjPCvmdPOd7oPd7cPD4vJSXomfuM2nqmqqv5HZs5L9GfoUzah64LTyuI5Pbn7eH8_v0gHLJ2V77r5PM2my-UFE9FH9Q6ZTRc3yywZiEP3osdhNOK29qJ5hu8_uZ3mNVosNL6gLnDbeAxBOVuEKGJ4gqvrqy-wD6ixjJzb6BpYg3EhAs1ejv8NOouwhywvXWtjgMp5Sq9h0KEcgCduZ_lFica7StFfP1VZQRCm0b0Tt9kxGr2wgQwNOa7Au7-hty6dbo0N-3m-2q4pYkT0aksl5oNusfuzmv6g7128uR-10BUtlByXNyCshPK2Mwv7ZY5mg1IqW3etfs2lErV14dxgVCG0WDhPdy1s4SoaqFpZcj0udHEUKfIDbpeD8lveNUNUqdtA69Tx2sWuDBszg94IJWnj9puPs35TcpbSUGIlWh05o4UjtG2kiLiQKjrP0uhbHDPRRvfr1Zan-cDMqQ8vDEsroQNFsdeshgPSn5PDPyQQDsY?type=png)](https://mermaid.live/edit#pako:eNplk11v2jAUhv_KkSeUG1rRrtXWXEyCANvFQNM-ehNXkYlPUkv-iGynowL--04SKFSLosQ-53nfcxLbO1Y6iSxlo9GOWwBlVUyhHwIk8RkNJikkGxEwGV9GH4VXYqMxJG84pRqvjPCvmdPOd7oPd7cPD4vJSXomfuM2nqmqqv5HZs5L9GfoUzah64LTyuI5Pbn7eH8_v0gHLJ2V77r5PM2my-UFE9FH9Q6ZTRc3yywZiEP3osdhNOK29qJ5hu8_uZ3mNVosNL6gLnDbeAxBOVuEKGJ4gqvrqy-wD6ixjJzb6BpYg3EhAs1ejv8NOouwhywvXWtjgMp5Sq9h0KEcgCduZ_lFica7StFfP1VZQRCm0b0Tt9kxGr2wgQwNOa7Au7-hty6dbo0N-3m-2q4pYkT0aksl5oNusfuzmv6g7128uR-10BUtlByXNyCshPK2Mwv7ZY5mg1IqW3etfs2lErV14dxgVCG0WDhPdy1s4SoaqFpZcj0udHEUKfIDbpeD8lveNUNUqdtA69Tx2sWuDBszg94IJWnj9puPs35TcpbSUGIlWh05o4UjtG2kiLiQKjrP0uhbHDPRRvfr1Zan-cDMqQ8vDEsroQNFsdeshgPSn5PDPyQQDsY)
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ## 0. Configurations 
+
+# COMMAND ----------
+
+# DBTITLE 1,install umap
 # MAGIC %pip install umap-learn
 
 # COMMAND ----------
 
-# MAGIC %run ./util/notebook-config 
+# DBTITLE 1,create widgets
+sample_labels = ['primary_diagnosis','tissue_or_organ_of_origin','tumor_grade']
+dbutils.widgets.dropdown('sample_label','tissue_or_organ_of_origin',sample_labels)
 
 # COMMAND ----------
 
+# DBTITLE 1,create configs
+import logging
+import os 
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+path = "./util/configs.json"
+_flag = not os.path.isfile(path)
+if _flag:
+  logging.info(f'file {path} does not exist. Creating configurations file.')
+  dbutils.notebook.run("./util/notebook-config", 60, {"catalog name": "omics_demo", "schema name": "tcga"})
+
+# COMMAND ----------
+
+# DBTITLE 1,load configs
 import json
 with open('./util/configs.json', 'r') as f:
     configs = json.load(f)
@@ -26,33 +49,14 @@ schema_name = configs['catalog']['schema_name']
 staging_path = configs['paths']['staging_path']
 expression_files_path = configs['paths']['expression_files_path']
 
-
-# COMMAND ----------
-
 database_name = f'{catalog_name}.{schema_name}'
 print(database_name)
 
 # COMMAND ----------
 
-sample_labels = ['primary_diagnosis','tissue_or_organ_of_origin','tumor_grade']
-dbutils.widgets.dropdown('sample_label','tissue_or_organ_of_origin',sample_labels)
-
-# COMMAND ----------
-
-from pyspark.sql.functions import *
-from pyspark.sql.types import *
-from pyspark.sql import Window
-
-import numpy as np
-import pandas as pd
-import os
-import json
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ### Data Preparation
-# MAGIC Note that the tcga expressions are normalized using three commonly used methods:
+# MAGIC Now we proceed tp prepare expression profiles data for clustering. Note that the tcga expressions are normalized using three commonly used methods:
 # MAGIC
 # MAGIC 1. FPKM 
 # MAGIC   The fragments per kilobase of transcript per million mapped reads (FPKM) calculation aims to control for transcript length and overall sequencing quantity.
@@ -63,10 +67,11 @@ import json
 # MAGIC 3.  TPM 
 # MAGIC   The transcripts per million calculation is similar to FPKM, but the difference is that all transcripts are normalized for length first. Then, instead of using the total overall read count as a normalization for size, the sum of the length-normalized transcript values are used as an indicator of size.
 # MAGIC
-# MAGIC In the following analysis we use FPKM values for exploring clusters.
+# MAGIC In the following analysis we use FPKM values for exploring clusters. 
 
 # COMMAND ----------
 
+# DBTITLE 1,load summary statistics data 
 sample_stats_df= sql(f'select * from {database_name}.sample_level_expression_stats')
 gene_stats_df = sql(f'select * from {database_name}.gene_level_expression_stats')
 
@@ -82,24 +87,27 @@ gene_stats_df.display()
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Select the most variable genes
-# MAGIC Since we are primarily interested in clustering samples based on their expression counts, we first select a subset of genes that have high varaiblity among different samples and then apply dimensionality reduction on these subset of fratures. 
+# MAGIC ### Select the Most Variable Genes
+# MAGIC Since we are primarily interested in clustering samples based on their expression counts, we first select a subset of genes that have high variability among different samples and then apply dimensionality reduction on this subset of features.
 
 # COMMAND ----------
+
+from pyspark.sql.functions import col 
 
 selected_genes = gene_stats_df.orderBy(col('v_fpkm').desc()).limit(20000).select('gene_id')
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Convert expression profiles
-# MAGIC Now we transform the expression profiles so that each row corresponds to a given sample and columns correspond to selected genes. 
+# MAGIC ### Convert Expression Profiles
+# MAGIC Now, we transform the expression profiles so that each row corresponds to a given sample, and each column corresponds to the selected genes.
+# MAGIC
 
 # COMMAND ----------
 
-from pyspark.sql.functions import pandas_udf
+from pyspark.sql.functions import pandas_udf, collect_list
 from pyspark.ml.linalg import Vectors, VectorUDT
-
+from pyspark.sql import DataFrame
 from pyspark.sql.functions import pandas_udf, PandasUDFType
 import pandas as pd
 
@@ -155,11 +163,12 @@ def get_embeddings(df,feature_col,params):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Now we create embeddings based on `fpkm` column, we can repeat this for other columns (`fpkm_uq_list` or `tpm_list`) 
+# MAGIC Now we create embeddings based on `fpkm` column. We can also repeat this analysis using other columns (`fpkm_uq_list` or `tpm_list`) 
 
 # COMMAND ----------
 
 # DBTITLE 1,create a pandas on spark dataframe of embeddings 
+import numpy as np
 expression_embedding_spdf = get_embeddings(expressions_vec_df,'fpkm_list',params)
 
 # COMMAND ----------
@@ -168,12 +177,13 @@ expression_embedding_spdf.shape
 
 # COMMAND ----------
 
+# DBTITLE 1,embeddings dataset 
 expression_embedding_spdf.head()
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Combine with clinical data
+# MAGIC ### Combine with Clinical Data
 # MAGIC Now we add clinical data to be used for labeling each sample in the UMAP plot. 
 
 # COMMAND ----------
@@ -213,4 +223,5 @@ fig.show()
 
 # MAGIC %md
 # MAGIC
-# MAGIC As you can see, the identified clusters correspond to `tissue_or_organ_of_origin`. Now, go ahead and change the `sample_label` in the widget on this notbook and select `primary_diagnosis` and you will still see the colors still correspond to detected clsuters, but to a lesser dedgree. 
+# MAGIC As you can see, the identified clusters correspond to `tissue_or_organ_of_origin`. Now, go ahead and change the `sample_label` in the widget on this notebook and select `primary_diagnosis`. You will see that the colors still correspond to the detected clusters, but to a lesser degree.
+# MAGIC

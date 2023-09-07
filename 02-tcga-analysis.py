@@ -1,20 +1,31 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC ## Interactive Data Analysis
-# MAGIC In this notebook we show simple analysis of the data by looking at average daily cigartes smoked within each primary diagnosis groups. 
+# MAGIC # Interactive Data Analysis
+# MAGIC In this notebook, we show a simple analysis of the data by looking at the average daily cigarettes smoked within each primary diagnosis group. We also demonstrate how you can use the `pyspark_ai` API to interact with your data in natural language (assuming access to an OpenAI API key).
+# MAGIC
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Configuration
+# MAGIC ## 0. Configuration
 
 # COMMAND ----------
 
+# DBTITLE 1,install spark ai 
 # MAGIC %pip install pyspark_ai
 
 # COMMAND ----------
 
-# MAGIC %run ./util/notebook-config 
+import logging
+import os 
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+path = "./util/configs.json"
+_flag = not os.path.isfile(path)
+if _flag:
+  logging.info(f'file {path} does not exist. Creating configurations file.')
+  dbutils.notebook.run("./util/notebook-config", 60, {"catalog name": "omics_demo", "schema name": "tcga"})
 
 # COMMAND ----------
 
@@ -35,6 +46,11 @@ sql(f'show tables in {catalog_name}.{schema_name}').display()
 # COMMAND ----------
 
 sql(f'describe {catalog_name}.{schema_name}.diagnoses').display()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 1. Analysis 
 
 # COMMAND ----------
 
@@ -77,24 +93,27 @@ sql(f"""
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Query using natural langauge 
-# MAGIC If you have an OpenAI API key, you can use [pyspark_ai](https://github.com/databrickslabs/pyspark-ai) API to interact with any given table using natural language.
+# MAGIC ## 2. Query Using Natural Langauge 
+# MAGIC If you have an OpenAI API key, you can use [pyspark_ai](https://github.com/databrickslabs/pyspark-ai) API to interact with any given table using natural language. To specify your API key, you can either enter the key directly in the notebook using the following command, or store your key using [`dbutils.secrets`.](https://docs.databricks.com/en/security/secrets/secrets.html)
 
 # COMMAND ----------
 
-# DBTITLE 1,enter openAI api key
-import getpass
-os.environ["OPENAI_API_KEY"] = getpass.getpass()
+# DBTITLE 1,enter openAI api key interactively 
+# MAGIC %md
+# MAGIC ```
+# MAGIC import getpass
+# MAGIC os.environ["OPENAI_API_KEY"] = getpass.getpass()
+# MAGIC ```
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Alternatively you can securely store your API key using a secret scope and use the key.
+# MAGIC Alternatively you can securely store your API key using a [secret scope](https://docs.databricks.com/en/security/secrets/secrets.html) and use the key. After setting up your key, replace the `scope` and `key` in the cell bellow and run the notebook. 
 
 # COMMAND ----------
 
 import os
-os.environ["OPENAI_API_KEY"] = dbutils.secrets.get(scope="amir-tokens", key="openAI")
+os.environ["OPENAI_API_KEY"] = dbutils.secrets.get(scope="hls-tokens ", key="openAI")
 
 # COMMAND ----------
 

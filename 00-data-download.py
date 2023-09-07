@@ -13,23 +13,30 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 0. Initial Configurations
+# MAGIC ## 0. Initial configurations
 
 # COMMAND ----------
 
-# DBTITLE 1,making function definitions accessible
+# DBTITLE 1,make function definitions accessible
 # MAGIC %run ./util/functions
 
 # COMMAND ----------
 
-# DBTITLE 1,creating notebook configuations
-# MAGIC %run ./util/notebook-config
-
-# COMMAND ----------
-
-# DBTITLE 1,load configurations 
+# DBTITLE 1,create notebook configurations
+import logging
+import os 
 import json
-with open('./util/configs.json', 'r') as f:
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+path = "./util/configs.json"
+_flag = not os.path.isfile(path)
+if _flag:
+  logging.info(f'file {path} does not exist. Creating configurations file.')
+  dbutils.notebook.run("./util/notebook-config", 60, {"catalog name": "omics_demo", "schema name": "tcga"})
+
+
+with open(path, 'r') as f:
     configs = json.load(f)
 
 staging_path=configs['paths']['staging_path']
@@ -38,7 +45,7 @@ expression_files_path = configs['paths']['expression_files_path']
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 1. Download Data
+# MAGIC ## 1. Download data from GDC
 
 # COMMAND ----------
 
@@ -68,9 +75,14 @@ files_filters = [
   ('access','in',['open'])
   ]
 
-path = f"/dbfs{staging_path}/expressions_info.tsv"
-download_table(files_endpt,file_fields,path,size=20000,filters=files_filters)
+path = f"/dbfs/{staging_path}/expressions_info.tsv"
+_flag = not os.path.isfile(path)
 
+if _flag:
+  logging.info(f'file {path} does not exist. Downloading expressions_info.tsv')
+  download_table(files_endpt,file_fields,path,size=20000,filters=files_filters)
+else:
+  logging.info(f'file {path} already exists')
 
 files_list_pdf=pd.read_csv(path,sep='\t')
 print(f'downloaded {files_list_pdf.shape[0]} records')
@@ -84,8 +96,14 @@ files_list_pdf.head()
 # COMMAND ----------
 
 # DBTITLE 1,download expressions
+path = f'/dbfs{expression_files_path}'
+_flag = not bool(os.listdir(path))
 uuids=files_list_pdf.file_id.to_list()
-download_expressions(f"/dbfs{expression_files_path}",uuids,n_workers=48)
+if _flag:
+  logging.info(f'file {path} does not exist. Downloading expressions_info.tsv')
+  download_expressions(path,uuids)
+else:
+  logging.info('expression files already downloaded.')
 
 # COMMAND ----------
 
@@ -134,8 +152,15 @@ cases_filters = [
   ('cases.project.program.name','in',['TCGA']),
 ]
 
-download_table(cases_endpt,fields,f"/dbfs{staging_path}/cases.tsv",size=100000,filters=cases_filters)
+path = f"{staging_path}/cases.tsv"
+download_flag = not os.path.isfile('/dbfs'+path)
 
-df=spark.read.csv(f"{staging_path}/cases.tsv",sep='\t',header=True)
+if download_flag:
+  logging.info(f'file {path} does not exist. Downloading cases.tsv')
+  download_table(cases_endpt,fields,'/dbfs'+path,size=100000,filters=cases_filters)
+else:
+  logging.info(f'file {path} already exists')
+
+df=spark.read.csv(path,sep='\t',header=True)
 print(f"n_records in cases is {df.count()}")
 display(df)

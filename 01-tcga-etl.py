@@ -1,10 +1,10 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC ## ETL 
-# MAGIC In this notebook we conform the raw data into a data model and publish the data to Unity Catalog for downstream analysis.
-# MAGIC The following summarized the dataflow
+# MAGIC In this notebook we conform the downloaded data into a given data model and publish the resulting tables to Unity Catalog for downstream analysis.
+# MAGIC The following diagram summarized the dataflow.
 # MAGIC
-# MAGIC [![](https://mermaid.ink/img/pako:eNqFk1Fr2zAQx7-K0Ah-SUa2tmz1wyB1lFJoYSzbKNjDKNY5FdiSkeTSUvLdd7ajWE4f6gdbuv_v9NfJujdaaAE0prPZW6YIkUq6mPRDQiL3BDVEMYl23EI0D6N_uZF8V4GNTjhKjZE1N6-JrrTp8j5dfr2-ZkufOhK_4cWNVFmW75EbbQSYEfqWLPEJuEoqGOXl5cXV1TqQLRRaicluvq-S1WYTMA6MkxPkZsW-bJJoIA7dB1-H2SxTe8ObJ3L_a5BsuxsCRaVbQazThu9h0JK0wPOypJR4Pv-GGEvhpTFgrdRqEEgNjgvuuCd-hkhjdJgOSpz5_klIpo5-R0O_UOiV96vkUpX6JIdG-ZnR-i4Vku-VDtZ77HhtWzNSLBVQ634nsvDR2_ttugcFeQXPUOWBiXXceWqLlOV1U33A9SUfCySLxQ8s87ifbsaYP7Vew6LG0yCLzxha3_l6p3Ovs8ep7uenfHaWz7wD60wxhPVOA1gandMaTM2lwKbqGyOjfcNkNMahgJK3lcsoXipE2wYvADAh8frQ2JkW5pS3Tm9fVUHjklcWPLTGv2J4fYpCn_QwdG_fxIf_Lgop1Q?type=png)](https://mermaid.live/edit#pako:eNqFk1Fr2zAQx7-K0Ah-SUa2tmz1wyB1lFJoYSzbKNjDKNY5FdiSkeTSUvLdd7ajWE4f6gdbuv_v9NfJujdaaAE0prPZW6YIkUq6mPRDQiL3BDVEMYl23EI0D6N_uZF8V4GNTjhKjZE1N6-JrrTp8j5dfr2-ZkufOhK_4cWNVFmW75EbbQSYEfqWLPEJuEoqGOXl5cXV1TqQLRRaicluvq-S1WYTMA6MkxPkZsW-bJJoIA7dB1-H2SxTe8ObJ3L_a5BsuxsCRaVbQazThu9h0JK0wPOypJR4Pv-GGEvhpTFgrdRqEEgNjgvuuCd-hkhjdJgOSpz5_klIpo5-R0O_UOiV96vkUpX6JIdG-ZnR-i4Vku-VDtZ77HhtWzNSLBVQ634nsvDR2_ttugcFeQXPUOWBiXXceWqLlOV1U33A9SUfCySLxQ8s87ifbsaYP7Vew6LG0yCLzxha3_l6p3Ovs8ep7uenfHaWz7wD60wxhPVOA1gandMaTM2lwKbqGyOjfcNkNMahgJK3lcsoXipE2wYvADAh8frQ2JkW5pS3Tm9fVUHjklcWPLTGv2J4fYpCn_QwdG_fxIf_Lgop1Q)
+# MAGIC [![](https://mermaid.ink/img/pako:eNqFk19r2zAUxb-K0Ah-SUbWP6z1wyB1lFHoYCzdKNjDKNZ1KrAlI8lbS8l377UdxXL2sDwk1jm_q6Or-L7RQgugMZ3N3jJFiFTSxaR_JCRyz1BDFJNoxy1E81D9xY3kuwpsdMLRaoysuXlNdKVNV_fh6uL2li196Ug8wosbqbIs_0XutBFgRuhzssRPwFVSwWgvry6vr9eBbaHQSkxOc7NKVptNwDgwTk6QuxX7tEmigTh0P_h1mM0ytTe8eSYPPwbLtrtBMPwvKSVexKAnaYF3ZQfp96CxFF4aA9ZKrQaD1OC44I574nuINEaH5aDEWebPhGTqmHcM9BuFWXm_Sy5VqU92GJSfBa3vUyH5Xulgv6eO17Y1I8VSAbXuTyILr3592KZ7UJBX8AeqPAixjjtPbZGyvG6q_3B9y8cGyWLxBds8nqdbMeZvrfewqfE2yOIjSut73-907X32NPX9-lTPzuqZT2BdKErY71TA1uic1mBqLgUOVD8UGe2HJaMxPgooeVu5jOILhWjb4AsATEinDY2daWFOeev09lUVNC55ZcFDa_xXDK9PKvRF34bJ7Qf48A50ECgm?type=png)](https://mermaid.live/edit#pako:eNqFk19r2zAUxb-K0Ah-SUbWP6z1wyB1lFHoYCzdKNjDKNZ1KrAlI8lbS8l377UdxXL2sDwk1jm_q6Or-L7RQgugMZ3N3jJFiFTSxaR_JCRyz1BDFJNoxy1E81D9xY3kuwpsdMLRaoysuXlNdKVNV_fh6uL2li196Ug8wosbqbIs_0XutBFgRuhzssRPwFVSwWgvry6vr9eBbaHQSkxOc7NKVptNwDgwTk6QuxX7tEmigTh0P_h1mM0ytTe8eSYPPwbLtrtBMPwvKSVexKAnaYF3ZQfp96CxFF4aA9ZKrQaD1OC44I574nuINEaH5aDEWebPhGTqmHcM9BuFWXm_Sy5VqU92GJSfBa3vUyH5Xulgv6eO17Y1I8VSAbXuTyILr3592KZ7UJBX8AeqPAixjjtPbZGyvG6q_3B9y8cGyWLxBds8nqdbMeZvrfewqfE2yOIjSut73-907X32NPX9-lTPzuqZT2BdKErY71TA1uic1mBqLgUOVD8UGe2HJaMxPgooeVu5jOILhWjb4AsATEinDY2daWFOeev09lUVNC55ZcFDa_xXDK9PKvRF34bJ7Qf48A50ECgm)
 
 # COMMAND ----------
 
@@ -13,10 +13,21 @@
 
 # COMMAND ----------
 
-# MAGIC %run ./util/notebook-config 
+# DBTITLE 1,create configurations
+import logging
+import os 
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+path = "./util/configs.json"
+_flag = not os.path.isfile(path)
+if _flag:
+  logging.info(f'file {path} does not exist. Creating configurations file.')
+  dbutils.notebook.run("./util/notebook-config", 60, {"catalog name": "omics_demo", "schema name": "tcga"})
 
 # COMMAND ----------
 
+# DBTITLE 1,setup configurations 
 import json
 with open('./util/configs.json', 'r') as f:
     configs = json.load(f)
@@ -38,7 +49,7 @@ from pyspark.sql.types import *
 
 # COMMAND ----------
 
-# DBTITLE 1,load expression profiles
+# DBTITLE 1,expression profiles
 def read_expression_files_info(staging_path):
   return (
     spark.read.csv(f'{staging_path}/expressions_info.tsv', sep='\t', header=True,inferSchema=True)
@@ -47,16 +58,14 @@ def read_expression_files_info(staging_path):
 
 # COMMAND ----------
 
-# DBTITLE 1,Cases
-# Patient demographics, diagnoses and exposures ingested from staging_path
-
+# DBTITLE 1,cases
 def read_cases(staging_path):
   return spark.read.csv(f'{staging_path}/cases.tsv', sep='\t', header=True, inferSchema=True)
 
 
 # COMMAND ----------
 
-# DBTITLE 1,Demographics 
+# DBTITLE 1,demographics 
 ## patient demographics ingested from files downloaded from GDC API.
   
 def extract_cases_demographics(cases_df,expression_files_info_df):
@@ -174,7 +183,7 @@ def get_gene_level_expression_stats(expression_profiles_df):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Create Catalog
+# MAGIC ## 2. Create UC Catalog
 
 # COMMAND ----------
 

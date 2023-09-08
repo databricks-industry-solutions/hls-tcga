@@ -22,7 +22,7 @@
 
 # COMMAND ----------
 
-FORCE_DOWNLOAD=True
+FORCE_DOWNLOAD=False
 
 # COMMAND ----------
 

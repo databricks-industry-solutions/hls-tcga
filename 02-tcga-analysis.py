@@ -81,6 +81,7 @@ sql(f"""
 # MAGIC %md
 # MAGIC ## 2. Query Using Natural Langauge 
 # MAGIC If you have an OpenAI API key, you can use [pyspark_ai](https://github.com/databrickslabs/pyspark-ai) API to interact with any given table using natural language. To specify your API key, you can either enter the key directly in the notebook using the following command, or store your key using [`dbutils.secrets`.](https://docs.databricks.com/en/security/secrets/secrets.html)
+# MAGIC To try this feature, remove `%md` in the following cells and run the cell. 
 
 # COMMAND ----------
 
@@ -98,17 +99,23 @@ sql(f"""
 
 # COMMAND ----------
 
-import os
-os.environ["OPENAI_API_KEY"] = dbutils.secrets.get(scope="hls-tokens ", key="openAI")
+# MAGIC %md 
+# MAGIC ```os.environ["OPENAI_API_KEY"] = dbutils.secrets.get(scope="<your scope>", key="<your key>")```
 
 # COMMAND ----------
 
-from pyspark_ai import SparkAI
-spark_ai = SparkAI(verbose=True)
-spark_ai.activate()  #
-df = sql('select * from EXPOSURE_HISTORY')
+# MAGIC %md
+# MAGIC ```
+# MAGIC from pyspark_ai import SparkAI
+# MAGIC spark_ai = SparkAI(verbose=True)
+# MAGIC spark_ai.activate()  #
+# MAGIC df = sql('select * from EXPOSURE_HISTORY')
+# MAGIC ```
 
 # COMMAND ----------
 
 # DBTITLE 1,repeat the analysis using natural language
-df.ai.plot('plot a bar chart of averegae cigarretes smoked vs primary diagnosis for the top 20 primary diagnosis')
+# MAGIC %md
+# MAGIC ```
+# MAGIC df.ai.plot('plot a bar chart of averegae cigarretes smoked vs primary diagnosis for the top 20 primary diagnosis')
+# MAGIC ```

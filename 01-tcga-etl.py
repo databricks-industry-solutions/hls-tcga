@@ -167,15 +167,16 @@ def get_gene_level_expression_stats(expression_profiles_df):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Create UC Catalog
+# MAGIC ## 2. Catalog Setup 
 
 # COMMAND ----------
 
-# Create a catalog.
+# DBTITLE 1,create the catalog
 spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG_NAME}")
 
 # COMMAND ----------
 
+# DBTITLE 1,grant access to account users
 # Grant create and use catalog permissions for the catalog to all users on the account.
 # This also works for other account-level groups and individual users.
 spark.sql(f"""
@@ -185,10 +186,17 @@ spark.sql(f"""
 
 # COMMAND ----------
 
+# DBTITLE 1,create the schema 
 # Create a schema in the catalog that was set earlier.
 spark.sql(f"""
   CREATE SCHEMA IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}
   COMMENT 'schmea for TCGA expression profiles and metadata'""")
+
+# COMMAND ----------
+
+# DBTITLE 1,grant access to the schema
+#grant access to schema
+sql(f"GRANT USE SCHEMA, CREATE TABLE ON SCHEMA {CATALOG_NAME}.{SCHEMA_NAME} TO `account users`")
 
 # COMMAND ----------
 
@@ -240,3 +248,14 @@ get_sample_level_expression_stats(expression_profiles_df).write.mode("overwrite"
 
 # DBTITLE 1,add gene-level stats
 get_gene_level_expression_stats(expression_profiles_df).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.gene_level_expression_stats')
+
+# COMMAND ----------
+
+# DBTITLE 1,grant access to tables in the schema 
+#grant access to tables in the schema 
+my_schema = f'{CATALOG_NAME}.{SCHEMA_NAME}'
+for t in [m.tableName for m in sql(f'show tables in {my_schema}').collect()]:
+  sql(f"""
+  GRANT SELECT, MODIFY
+  ON TABLE {my_schema}.{t}
+  TO `account users`""")

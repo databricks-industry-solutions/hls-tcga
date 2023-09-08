@@ -20,36 +20,21 @@
 
 # COMMAND ----------
 
+# MAGIC %run ./util/configurations
+
+# COMMAND ----------
+
 # DBTITLE 1,create widgets
 sample_labels = ['primary_diagnosis','tissue_or_organ_of_origin','tumor_grade']
 dbutils.widgets.dropdown('sample_label','tissue_or_organ_of_origin',sample_labels)
 
 # COMMAND ----------
 
-# DBTITLE 1,create configs
-import logging
-import os 
+# DBTITLE 1,set up paths
+staging_path = f"/home/{USER}/{CATALOG_NAME}/{SCHEMA_NAME}/staging"
+expression_files_path = f"{staging_path}/expressions"
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-path = "./util/configs.json"
-_flag = not os.path.isfile(path)
-if _flag:
-  logging.info(f'file {path} does not exist. Creating configurations file.')
-  dbutils.notebook.run("./util/notebook-config", 60, {"catalog name": "omics_demo", "schema name": "tcga"})
-
-# COMMAND ----------
-
-# DBTITLE 1,load configs
-import json
-with open('./util/configs.json', 'r') as f:
-    configs = json.load(f)
-catalog_name = configs['catalog']['ctalog_name']
-schema_name = configs['catalog']['schema_name']
-staging_path = configs['paths']['staging_path']
-expression_files_path = configs['paths']['expression_files_path']
-
-database_name = f'{catalog_name}.{schema_name}'
+database_name = f'{CATALOG_NAME}.{SCHEMA_NAME}'
 print(database_name)
 
 # COMMAND ----------

@@ -1,4 +1,23 @@
 # Databricks notebook source
+# MAGIC %md
+# MAGIC ## Solution Accelerator Configurations
+
+# COMMAND ----------
+
+# DBTITLE 1,notebook params
+dbutils.widgets.text('catalog name','omics_demo')
+dbutils.widgets.text('schema name','tcga')
+
+# COMMAND ----------
+
+# DBTITLE 1,catalog name
+USER=sql('select current_user() as user').collect()[0].user
+
+CATALOG_NAME = dbutils.widgets.get('catalog name')
+SCHEMA_NAME = dbutils.widgets.get('schema name')
+
+# COMMAND ----------
+
 # DBTITLE 1,function to download a given table
 import requests
 import json

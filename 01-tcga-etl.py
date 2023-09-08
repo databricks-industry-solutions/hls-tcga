@@ -13,29 +13,13 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,create configurations
-import logging
-import os 
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-path = "./util/configs.json"
-_flag = not os.path.isfile(path)
-if _flag:
-  logging.info(f'file {path} does not exist. Creating configurations file.')
-  dbutils.notebook.run("./util/notebook-config", 60, {"catalog name": "omics_demo", "schema name": "tcga"})
+# MAGIC %run ./util/configurations
 
 # COMMAND ----------
 
-# DBTITLE 1,setup configurations 
-import json
-with open('./util/configs.json', 'r') as f:
-    configs = json.load(f)
-catalog_name = configs['catalog']['ctalog_name']
-schema_name = configs['catalog']['schema_name']
-staging_path = configs['paths']['staging_path']
-expression_files_path = configs['paths']['expression_files_path']
-
+# DBTITLE 1,setup paths 
+staging_path = f"/home/{USER}/{CATALOG_NAME}/{SCHEMA_NAME}/staging"
+expression_files_path = f"{staging_path}/expressions"
 
 # COMMAND ----------
 
@@ -188,7 +172,7 @@ def get_gene_level_expression_stats(expression_profiles_df):
 # COMMAND ----------
 
 # Create a catalog.
-spark.sql(f"CREATE CATALOG IF NOT EXISTS {catalog_name}")
+spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG_NAME}")
 
 # COMMAND ----------
 
@@ -196,14 +180,14 @@ spark.sql(f"CREATE CATALOG IF NOT EXISTS {catalog_name}")
 # This also works for other account-level groups and individual users.
 spark.sql(f"""
   GRANT CREATE, USE CATALOG
-  ON CATALOG {catalog_name}
+  ON CATALOG {CATALOG_NAME}
   TO `account users`""")
 
 # COMMAND ----------
 
 # Create a schema in the catalog that was set earlier.
 spark.sql(f"""
-  CREATE SCHEMA IF NOT EXISTS {catalog_name}.{schema_name}
+  CREATE SCHEMA IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}
   COMMENT 'schmea for TCGA expression profiles and metadata'""")
 
 # COMMAND ----------
@@ -214,45 +198,45 @@ spark.sql(f"""
 # COMMAND ----------
 
 # DBTITLE 1,add cases
-read_cases(staging_path).write.mode("overwrite").saveAsTable(f'{catalog_name}.{schema_name}.cases')
+read_cases(staging_path).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.cases')
 
 # COMMAND ----------
 
 # DBTITLE 1,add expression profile information
-read_expression_files_info(staging_path).write.mode("overwrite").saveAsTable(f'{catalog_name}.{schema_name}.expression_files_info')
+read_expression_files_info(staging_path).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.expression_files_info')
 
 # COMMAND ----------
 
-cases_df = sql(f'SELECT * from {catalog_name}.{schema_name}.cases')
-expression_files_info_df = sql(f'SELECT * from {catalog_name}.{schema_name}.expression_files_info')
+cases_df = sql(f'SELECT * from {CATALOG_NAME}.{SCHEMA_NAME}.cases')
+expression_files_info_df = sql(f'SELECT * from {CATALOG_NAME}.{SCHEMA_NAME}.expression_files_info')
 
 # COMMAND ----------
 
 # DBTITLE 1,add demographics
-extract_cases_demographics(cases_df,expression_files_info_df).write.mode("overwrite").saveAsTable(f'{catalog_name}.{schema_name}.demographics')
+extract_cases_demographics(cases_df,expression_files_info_df).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.demographics')
 
 # COMMAND ----------
 
 # DBTITLE 1,add diagnosis
-extract_cases_diagnoses(cases_df,expression_files_info_df).write.mode("overwrite").saveAsTable(f'{catalog_name}.{schema_name}.diagnoses')
+extract_cases_diagnoses(cases_df,expression_files_info_df).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.diagnoses')
 
 # COMMAND ----------
 
 # DBTITLE 1,add exposures
-extract_cases_exposures(cases_df,expression_files_info_df).write.mode("overwrite").saveAsTable(f'{catalog_name}.{schema_name}.exposures')
+extract_cases_exposures(cases_df,expression_files_info_df).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.exposures')
 
 # COMMAND ----------
 
 # DBTITLE 1,add expression profiles
 expression_profiles_df = read_expression_profiles(staging_path)
-expression_profiles_df.write.mode("overwrite").saveAsTable(f'{catalog_name}.{schema_name}.expression_profiles')
+expression_profiles_df.write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.expression_profiles')
 
 # COMMAND ----------
 
 # DBTITLE 1,add sample level stats
-get_sample_level_expression_stats(expression_profiles_df).write.mode("overwrite").saveAsTable(f'{catalog_name}.{schema_name}.sample_level_expression_stats')
+get_sample_level_expression_stats(expression_profiles_df).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.sample_level_expression_stats')
 
 # COMMAND ----------
 
 # DBTITLE 1,add gene-level stats
-get_gene_level_expression_stats(expression_profiles_df).write.mode("overwrite").saveAsTable(f'{catalog_name}.{schema_name}.gene_level_expression_stats')
+get_gene_level_expression_stats(expression_profiles_df).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.gene_level_expression_stats')

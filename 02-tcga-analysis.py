@@ -16,36 +16,22 @@
 
 # COMMAND ----------
 
-import logging
-import os 
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-path = "./util/configs.json"
-_flag = not os.path.isfile(path)
-if _flag:
-  logging.info(f'file {path} does not exist. Creating configurations file.')
-  dbutils.notebook.run("./util/notebook-config", 60, {"catalog name": "omics_demo", "schema name": "tcga"})
+# MAGIC %run ./util/configurations
 
 # COMMAND ----------
 
-import json
-with open('./util/configs.json', 'r') as f:
-    configs = json.load(f)
-catalog_name = configs['catalog']['ctalog_name']
-schema_name = configs['catalog']['schema_name']
-staging_path = configs['paths']['staging_path']
-expression_files_path = configs['paths']['expression_files_path']
-
+# DBTITLE 1,set up paths
+staging_path = f"/home/{USER}/{CATALOG_NAME}/{SCHEMA_NAME}/staging"
+expression_files_path = f"{staging_path}/expressions"
 
 # COMMAND ----------
 
 # DBTITLE 1,look at available tables
-sql(f'show tables in {catalog_name}.{schema_name}').display()
+sql(f'show tables in {CATALOG_NAME}.{SCHEMA_NAME}').display()
 
 # COMMAND ----------
 
-sql(f'describe {catalog_name}.{schema_name}.diagnoses').display()
+sql(f'describe {CATALOG_NAME}.{SCHEMA_NAME}.diagnoses').display()
 
 # COMMAND ----------
 
@@ -57,7 +43,7 @@ sql(f'describe {catalog_name}.{schema_name}.diagnoses').display()
 # DBTITLE 1,top 20 diagnosis
 sql(f"""
     select primary_diagnosis, count(*) as cnt
-    from {catalog_name}.{schema_name}.diagnoses
+    from {CATALOG_NAME}.{SCHEMA_NAME}.diagnoses
     group by primary_diagnosis
     order by 2 desc
     limit 20
@@ -65,7 +51,7 @@ sql(f"""
 
 # COMMAND ----------
 
-sql(f'describe {catalog_name}.{schema_name}.exposures').display()
+sql(f'describe {CATALOG_NAME}.{SCHEMA_NAME}.exposures').display()
 
 # COMMAND ----------
 
@@ -74,8 +60,8 @@ sql(f"""
     CREATE OR REPLACE TEMPORARY VIEW EXPOSURE_HISTORY
     AS
     select e.case_id, int(e.cigarettes_per_day), e.alcohol_intensity, int(e.years_smoked), d.primary_diagnosis
-    from {catalog_name}.{schema_name}.exposures e
-    join {catalog_name}.{schema_name}.diagnoses d
+    from {CATALOG_NAME}.{SCHEMA_NAME}.exposures e
+    join {CATALOG_NAME}.{SCHEMA_NAME}.diagnoses d
     on e.case_id = d.case_id
 """)
 

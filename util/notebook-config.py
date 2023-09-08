@@ -29,7 +29,7 @@ import json
 
 configs = {'paths':{'staging_path':staging_path,'expression_files_path':expression_files_path},'catalog':{'ctalog_name':catalog_name,'schema_name':schema_name}} 
 
-with open('./configs.json', 'w') as f:
+with open('configs.json', 'w') as f:
     json.dump(configs, f)
 
 displayHTML(f"Configurations:<br>Staging Path: {staging_path}<br>Expression Profiles: {expression_files_path}<br>Catalog Name: {catalog_name}<br>Schema Name: {schema_name}")

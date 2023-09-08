@@ -18,7 +18,11 @@
 # COMMAND ----------
 
 # DBTITLE 1,make function definitions accessible
-# MAGIC %run ./util/functions
+# MAGIC %run ./util/configurations
+
+# COMMAND ----------
+
+FORCE_DOWNLOAD=True
 
 # COMMAND ----------
 
@@ -29,18 +33,8 @@ import json
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-path = "./util/configs.json"
-_flag = not os.path.isfile(path)
-if _flag:
-  logging.info(f'file {path} does not exist. Creating configurations file.')
-  dbutils.notebook.run("./util/notebook-config", 60, {"catalog name": "omics_demo", "schema name": "tcga"})
-
-
-with open(path, 'r') as f:
-    configs = json.load(f)
-
-staging_path=configs['paths']['staging_path']
-expression_files_path = configs['paths']['expression_files_path']
+staging_path = f"/home/{USER}/{CATALOG_NAME}/{SCHEMA_NAME}/staging"
+expression_files_path = f"{staging_path}/expressions"
 
 # COMMAND ----------
 
@@ -76,7 +70,7 @@ files_filters = [
   ]
 
 path = f"/dbfs/{staging_path}/expressions_info.tsv"
-_flag = not os.path.isfile(path)
+_flag = not os.path.isfile(path) or FORCE_DOWNLOAD
 
 if _flag:
   logging.info(f'file {path} does not exist. Downloading expressions_info.tsv')
@@ -97,7 +91,7 @@ files_list_pdf.head()
 
 # DBTITLE 1,download expressions
 path = f'/dbfs{expression_files_path}'
-_flag = not bool(os.listdir(path))
+_flag = not bool(os.listdir(path)) or FORCE_DOWNLOAD
 uuids=files_list_pdf.file_id.to_list()
 if _flag:
   logging.info(f'file {path} does not exist. Downloading expressions_info.tsv')
@@ -153,9 +147,9 @@ cases_filters = [
 ]
 
 path = f"{staging_path}/cases.tsv"
-download_flag = not os.path.isfile('/dbfs'+path)
+_flag = not os.path.isfile('/dbfs'+path) or FORCE_DOWNLOAD
 
-if download_flag:
+if _flag:
   logging.info(f'file {path} does not exist. Downloading cases.tsv')
   download_table(cases_endpt,fields,'/dbfs'+path,size=100000,filters=cases_filters)
 else:

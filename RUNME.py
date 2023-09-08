@@ -78,24 +78,10 @@ job_json = {
             {
                 "job_cluster_key": "tcga_solacc_cluster",
                 "notebook_task": {
-                    "notebook_path": f"util/notebook-config"
-                },
-                "task_key": "tcga_conf_000",
-                "run_if": "ALL_SUCCESS"
-            },
-            
-            {
-                "job_cluster_key": "tcga_solacc_cluster",
-                "notebook_task": {
                     "notebook_path": f"00-data-download"
                 },
                 "task_key": "tcga_00",
-                "run_if": "ALL_SUCCESS",
-                "depends_on": [
-                    {
-                        "task_key": "tcga_conf_000"
-                    }
-                ]
+                "run_if": "ALL_SUCCESS"
             },
             {
                 "job_cluster_key": "tcga_solacc_cluster",

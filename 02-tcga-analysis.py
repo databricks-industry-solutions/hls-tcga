@@ -20,12 +20,6 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,set up paths
-staging_path = f"/home/{USER}/{CATALOG_NAME}/{SCHEMA_NAME}/staging"
-expression_files_path = f"{staging_path}/expressions"
-
-# COMMAND ----------
-
 # DBTITLE 1,look at available tables
 sql(f'show tables in {CATALOG_NAME}.{SCHEMA_NAME}').display()
 

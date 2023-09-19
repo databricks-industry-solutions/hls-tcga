@@ -26,18 +26,6 @@ FORCE_DOWNLOAD=False
 
 # COMMAND ----------
 
-# DBTITLE 1,create notebook configurations
-import logging
-import os 
-import json
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-staging_path = f"/home/{USER}/{CATALOG_NAME}/{SCHEMA_NAME}/staging"
-expression_files_path = f"{staging_path}/expressions"
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## 1. Download data from GDC
 
@@ -69,7 +57,7 @@ files_filters = [
   ('access','in',['open'])
   ]
 
-path = f"/dbfs/{staging_path}/expressions_info.tsv"
+path = f"{STAGING_PATH}/expressions_info.tsv"
 _flag = not os.path.isfile(path) or FORCE_DOWNLOAD
 
 if _flag:
@@ -90,7 +78,7 @@ files_list_pdf.head()
 # COMMAND ----------
 
 # DBTITLE 1,download expressions
-path = f'/dbfs{expression_files_path}'
+path = EXPRESSION_FILES_PATH
 _flag = not bool(os.listdir(path)) or FORCE_DOWNLOAD
 uuids=files_list_pdf.file_id.to_list()
 if _flag:
@@ -102,7 +90,7 @@ else:
 # COMMAND ----------
 
 # DBTITLE 1,take a look at a sample expression file
-sample_file=dbutils.fs.ls(f"{expression_files_path}")[0].path
+sample_file=dbutils.fs.ls(f"{EXPRESSION_FILES_PATH}")[0].path
 df=spark.read.csv(sample_file,sep='\t',comment="#",header=True)
 print(f"n_records in {sample_file} is {df.count()}")
 display(df)
@@ -146,12 +134,12 @@ cases_filters = [
   ('cases.project.program.name','in',['TCGA']),
 ]
 
-path = f"{staging_path}/cases.tsv"
-_flag = not os.path.isfile('/dbfs'+path) or FORCE_DOWNLOAD
+path = f"{STAGING_PATH}/cases.tsv"
+_flag = not os.path.isfile(path) or FORCE_DOWNLOAD
 
 if _flag:
   logging.info(f'file {path} does not exist. Downloading cases.tsv')
-  download_table(cases_endpt,fields,'/dbfs'+path,size=100000,filters=cases_filters)
+  download_table(cases_endpt,fields,path,size=100000,filters=cases_filters)
 else:
   logging.info(f'file {path} already exists')
 

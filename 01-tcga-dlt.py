@@ -9,13 +9,11 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import *
 import dlt
 
-import json
-with open('./util/configs.json', 'r') as f:
-    configs = json.load(f)
-catalog_name = configs['catalog']['ctalog_name']
-schema_name = configs['catalog']['schema_name']
-staging_path = configs['paths']['staging_path']
-expression_files_path = configs['paths']['expression_files_path']
+
+catalog_name = '<catalog name>'
+schema_name = '<schema name>'
+staging_path = '<staging path>'
+expression_files_path = '<expression files path>'
 
 
 # COMMAND ----------

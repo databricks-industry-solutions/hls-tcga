@@ -128,7 +128,7 @@ job_json = {
             {
                 "job_cluster_key": "tcga_solacc_cluster",
                 "new_cluster": {
-                    "spark_version": "13.0.x-scala2.12",
+                    "spark_version": "13.3.x-scala2.12",
                 "spark_conf": {
                     "spark.databricks.delta.formatCheck.enabled": "false"
                     },

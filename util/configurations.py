@@ -5,7 +5,7 @@
 # COMMAND ----------
 
 # DBTITLE 1,notebook params
-dbutils.widgets.text('catalog name','omics_solacc1')
+dbutils.widgets.text('catalog name','db_omics_solacc')
 dbutils.widgets.text('schema name','tcga')
 dbutils.widgets.text('volume name','tcga_files')
 

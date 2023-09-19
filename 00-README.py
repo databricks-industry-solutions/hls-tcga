@@ -1,10 +1,11 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # The Cancer Genome Atlas (TCGA)
+# MAGIC # R&D Lakehouse: The Cancer Genome Atlas (TCGA)
+# MAGIC <br>
 # MAGIC
-# MAGIC  <img src="https://www.cancer.gov/ccg/sites/g/files/xnrzdm256/files/styles/cgov_featured/public/cgov_image/media_image/2022-06/TCGA%20people%20and%20layers%20of%20data%20425x319.jpg?h=982f41e1&itok=zkQ_l8-t" width=200 >
+# MAGIC  <img src="https://www.cancer.gov/ccg/sites/g/files/xnrzdm256/files/styles/cgov_featured/public/cgov_image/media_image/2022-06/TCGA%20people%20and%20layers%20of%20data%20425x319.jpg?h=982f41e1&itok=zkQ_l8-t" width=50% >
 # MAGIC  
-# MAGIC [The Cancer Genome Atlas (TCGA)](https://www.cancer.gov/ccg/research/genome-sequencing/tcga) is a comprehensive and coordinated effort to accelerate our understanding of the molecular basis of cancer through the application of genome analysis technologies, including large-scale genome sequencing. TCGA was launched in 2006 by the [National Cancer Institute (NCI)](https://www.nih.gov/about-nih/what-we-do/nih-almanac/national-cancer-institute-nci)] and [National Human Genome Research Institute (NHGRI)](https://www.genome.gov/).
+# MAGIC [The Cancer Genome Atlas (TCGA)](https://www.cancer.gov/ccg/research/genome-sequencing/tcga) is a comprehensive and coordinated effort to accelerate our understanding of the molecular basis of cancer through the application of genome analysis technologies, including large-scale genome sequencing. TCGA was launched in 2006 by the [National Cancer Institute (NCI)](https://www.nih.gov/about-nih/what-we-do/nih-almanac/national-cancer-institute-nci) and [National Human Genome Research Institute (NHGRI)](https://www.genome.gov/).
 # MAGIC
 # MAGIC The goals of TCGA are:
 # MAGIC 1. Improve our ability to diagnose, treat and prevent cancer. By better understanding the genomic changes involved in cancer, we can develop more effective diagnostic and treatment approaches.
@@ -13,14 +14,17 @@
 # MAGIC 4. Improve cancer recurrence prediction. Learning about the genomic changes in tumors can help identify markers that indicate a higher risk of cancer coming back after treatment. 
 # MAGIC 5. Enable new discoveries through data sharing. TCGA shares all its data and analyses with the entire scientific community so anyone can conduct their own research, make new discoveries and develop better solutions.
 # MAGIC
-# MAGIC TCGA currently has over 2.5 petabytes of genomic, epigenomic, transcriptomic, and proteomic data from 33 types of cancer. Over 10,000 patients have contributed tumor samples and matched controls from blood or adjacent normal tissues. All data is available through the Genomic Data Commons, visually exploreable via the Integrated Genomics Viewer.
+# MAGIC TCGA currently has over [2.5 petabytes of genomic, epigenomic, transcriptomic, and proteomic data from 33 types of cancer](https://www.cancergenomicscloud.org/access-tcga-dataset#:~:text=The%20Cancer%20Genome%20Atlas%20(TCGA,TCGA%20is%20challenging%20to%20use.). Over 10,000 patients have contributed tumor samples and matched controls from blood or adjacent normal tissues. All data is available through the Genomic Data Commons, visually exploreable via the Integrated Genomics Viewer.
 # MAGIC
 # MAGIC TCGA is an unprecedented comprehensive catalog of the key genomic changes in major cancers. It continues to drive major advances in understanding cancer biology, revealing insights into mechanisms of tumorigenesis, and paving the way for new diagnostic and therapeutic approaches.
 # MAGIC
+# MAGIC
 # MAGIC ## Workflow overview
+# MAGIC In this solution accelerator, we provide a template for show how easily you can load RNA epxression profiles from [TCGA](https://portal.gdc.cancer.gov/) and clincial data associated with the samples into databricks lakehouse platform and apply different analysis on the dataset. 
+# MAGIC
+# MAGIC
 # MAGIC <img src="https://hls-eng-data-public.s3.amazonaws.com/img/tcga-umap.png" width=500 >
 # MAGIC
-# MAGIC In this demo, we show how easily you can load RNA epxression profiles from [TCGA](https://portal.gdc.cancer.gov/) and clincial data associated with the samples into databricks lakehouse platform and apply different analysis on the dataset. 
 # MAGIC
 # MAGIC - First we land RNA expession profiles along with clinical metadatae using <a href="$./00-data-download">00-data-download</a>
 # MAGIC notebook which uses [GDC APIs](https://gdc.cancer.gov/access-data/gdc-data-transfer-tool) to collect associated metadata and land data in the cloude strorage.

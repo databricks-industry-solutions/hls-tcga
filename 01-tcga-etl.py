@@ -4,7 +4,7 @@
 # MAGIC In this notebook we conform the downloaded data into a given data model and publish the resulting tables to Unity Catalog for downstream analysis.
 # MAGIC The following diagram summarized the dataflow.
 # MAGIC
-# MAGIC [![](https://mermaid.ink/img/pako:eNqFk19r2zAUxb-K0Ah-SUbWP6z1wyB1lFHoYCzdKNjDKNZ1KrAlI8lbS8l377UdxXL2sDwk1jm_q6Or-L7RQgugMZ3N3jJFiFTSxaR_JCRyz1BDFJNoxy1E81D9xY3kuwpsdMLRaoysuXlNdKVNV_fh6uL2li196Ug8wosbqbIs_0XutBFgRuhzssRPwFVSwWgvry6vr9eBbaHQSkxOc7NKVptNwDgwTk6QuxX7tEmigTh0P_h1mM0ytTe8eSYPPwbLtrtBMPwvKSVexKAnaYF3ZQfp96CxFF4aA9ZKrQaD1OC44I574nuINEaH5aDEWebPhGTqmHcM9BuFWXm_Sy5VqU92GJSfBa3vUyH5Xulgv6eO17Y1I8VSAbXuTyILr3592KZ7UJBX8AeqPAixjjtPbZGyvG6q_3B9y8cGyWLxBds8nqdbMeZvrfewqfE2yOIjSut73-907X32NPX9-lTPzuqZT2BdKErY71TA1uic1mBqLgUOVD8UGe2HJaMxPgooeVu5jOILhWjb4AsATEinDY2daWFOeev09lUVNC55ZcFDa_xXDK9PKvRF34bJ7Qf48A50ECgm?type=png)](https://mermaid.live/edit#pako:eNqFk19r2zAUxb-K0Ah-SUbWP6z1wyB1lFHoYCzdKNjDKNZ1KrAlI8lbS8l377UdxXL2sDwk1jm_q6Or-L7RQgugMZ3N3jJFiFTSxaR_JCRyz1BDFJNoxy1E81D9xY3kuwpsdMLRaoysuXlNdKVNV_fh6uL2li196Ug8wosbqbIs_0XutBFgRuhzssRPwFVSwWgvry6vr9eBbaHQSkxOc7NKVptNwDgwTk6QuxX7tEmigTh0P_h1mM0ytTe8eSYPPwbLtrtBMPwvKSVexKAnaYF3ZQfp96CxFF4aA9ZKrQaD1OC44I574nuINEaH5aDEWebPhGTqmHcM9BuFWXm_Sy5VqU92GJSfBa3vUyH5Xulgv6eO17Y1I8VSAbXuTyILr3592KZ7UJBX8AeqPAixjjtPbZGyvG6q_3B9y8cGyWLxBds8nqdbMeZvrfewqfE2yOIjSut73-907X32NPX9-lTPzuqZT2BdKErY71TA1uic1mBqLgUOVD8UGe2HJaMxPgooeVu5jOILhWjb4AsATEinDY2daWFOeev09lUVNC55ZcFDa_xXDK9PKvRF34bJ7Qf48A50ECgm)
+# MAGIC [![](https://mermaid.ink/img/pako:eNqFk1Fr2zAQx7-K0Ah-SUe2tWz1wyB1lFHoYCxbKdjDKNY5FdiSkeTRUvLde7YjW04f6gdb-v9_p9PJuhdaaAE0povFS6YIkUq6mPRDQiL3CDVEMYn23EK0DNV7biTfV2CjEUerMbLm5jnRlTZd3IfLz9fXbOVDJ-IPPLmJKsvyLXKjjQAzQV-TFT4BV0kFk726_HJ1tQlsC4VWYrabb-tkvd0GjAPj5Ay5WbNP2yQaiGP3wddxscjUwfDmkdz9Hizb7gfhb0LOlHtdtTXYQU3SAs_OklLiWf0bNJbCU2PAWqnVYJAaHBfccU_8CpHG6DAclBgGZ3l3Bf4Y7vOeEvsFw5x5v1ouValHO0yYnyXc3KZC8oPSwXoPHa9tayaKpQJq3e9FFl79cbdLD6Agr-A_VHmQxDruPLVDyvK6qd7hxtL7walScnHxHes9baybMeaPsfewuhFG-iNKm1tf-HzuffYw9_18jGdn8cxnYF1SlLDwuYA10iWtwdRcCuy4vmsy2ndTRmMcCih5W7mM4o1DtG3wRgAT0mlDY2daWFLeOr17VgWNS15Z8NAGf4_h9ahCH_RzaO2-w4-vPW4yHw?type=png)](https://mermaid.live/edit#pako:eNqFk1Fr2zAQx7-K0Ah-SUe2tWz1wyB1lFHoYCxbKdjDKNY5FdiSkeTRUvLde7YjW04f6gdb-v9_p9PJuhdaaAE0povFS6YIkUq6mPRDQiL3CDVEMYn23EK0DNV7biTfV2CjEUerMbLm5jnRlTZd3IfLz9fXbOVDJ-IPPLmJKsvyLXKjjQAzQV-TFT4BV0kFk726_HJ1tQlsC4VWYrabb-tkvd0GjAPj5Ay5WbNP2yQaiGP3wddxscjUwfDmkdz9Hizb7gfhb0LOlHtdtTXYQU3SAs_OklLiWf0bNJbCU2PAWqnVYJAaHBfccU_8CpHG6DAclBgGZ3l3Bf4Y7vOeEvsFw5x5v1ouValHO0yYnyXc3KZC8oPSwXoPHa9tayaKpQJq3e9FFl79cbdLD6Agr-A_VHmQxDruPLVDyvK6qd7hxtL7walScnHxHes9baybMeaPsfewuhFG-iNKm1tf-HzuffYw9_18jGdn8cxnYF1SlLDwuYA10iWtwdRcCuy4vmsy2ndTRmMcCih5W7mM4o1DtG3wRgAT0mlDY2daWFLeOr17VgWNS15Z8NAGf4_h9ahCH_RzaO2-w4-vPW4yHw)
 
 # COMMAND ----------
 
@@ -161,41 +161,7 @@ def get_gene_level_expression_stats(expression_profiles_df):
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Catalog Setup 
-
-# COMMAND ----------
-
-# DBTITLE 1,create the catalog
-# spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG_NAME}")
-
-# COMMAND ----------
-
-# DBTITLE 1,grant access to account users
-# # Grant create and use catalog permissions for the catalog to all users on the account.
-# # This also works for other account-level groups and individual users.
-# spark.sql(f"""
-#   GRANT CREATE, USE CATALOG
-#   ON CATALOG {CATALOG_NAME}
-#   TO `account users`""")
-
-# COMMAND ----------
-
-# DBTITLE 1,create the schema 
-# # Create a schema in the catalog that was set earlier.
-# spark.sql(f"""
-#   CREATE SCHEMA IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}
-#   COMMENT 'schmea for TCGA expression profiles and metadata'""")
-
-# COMMAND ----------
-
-# DBTITLE 1,grant access to the schema
-# #grant access to schema
-# sql(f"GRANT USE SCHEMA, CREATE TABLE ON SCHEMA {CATALOG_NAME}.{SCHEMA_NAME} TO `account users`")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 3. Add Tables
+# MAGIC ## 2. Add Tables
 
 # COMMAND ----------
 
@@ -253,7 +219,3 @@ for t in [m.tableName for m in sql(f'show tables in {my_schema}').collect()]:
   GRANT SELECT, MODIFY
   ON TABLE {my_schema}.{t}
   TO `account users`""")
-
-# COMMAND ----------
-
-

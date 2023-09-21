@@ -17,12 +17,6 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,setup paths 
-staging_path = f"/home/{USER}/{CATALOG_NAME}/{SCHEMA_NAME}/staging"
-expression_files_path = f"{staging_path}/expressions"
-
-# COMMAND ----------
-
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 
@@ -34,17 +28,17 @@ from pyspark.sql.types import *
 # COMMAND ----------
 
 # DBTITLE 1,expression profiles
-def read_expression_files_info(staging_path):
+def read_expression_files_info(STAGING_PATH):
   return (
-    spark.read.csv(f'{staging_path}/expressions_info.tsv', sep='\t', header=True,inferSchema=True)
+    spark.read.csv(f'{STAGING_PATH}/expressions_info.tsv', sep='\t', header=True,inferSchema=True)
     .withColumnRenamed('cases.0.case_id','case_id')
   )
 
 # COMMAND ----------
 
 # DBTITLE 1,cases
-def read_cases(staging_path):
-  return spark.read.csv(f'{staging_path}/cases.tsv', sep='\t', header=True, inferSchema=True)
+def read_cases(STAGING_PATH):
+  return spark.read.csv(f'{STAGING_PATH}/cases.tsv', sep='\t', header=True, inferSchema=True)
 
 
 # COMMAND ----------
@@ -104,7 +98,7 @@ def extract_cases_exposures(cases_df,expression_files_info_df):
 # DBTITLE 1,expression_profiles
 #"expression profiles ingested from files downloaded from GDC API.",
  
-def read_expression_profiles(staging_path):
+def read_expression_profiles(STAGING_PATH):
   schema = StructType([
   StructField('gene_id', StringType(), True),
   StructField('gene_name', StringType(), True),
@@ -118,7 +112,7 @@ def read_expression_profiles(staging_path):
   ])
 
   df = (
-    spark.read.csv(f'{staging_path}/expressions', comment="#", sep="\t", schema=schema)
+    spark.read.csv(f'{STAGING_PATH}/expressions', comment="#", sep="\t", schema=schema)
     .selectExpr('*','_metadata.file_name as file_id')
     # .withColumn('file_id', substring_index('_metadata.file_path','/',-1))
     .filter(~col('gene_id').rlike('N_'))
@@ -172,31 +166,31 @@ def get_gene_level_expression_stats(expression_profiles_df):
 # COMMAND ----------
 
 # DBTITLE 1,create the catalog
-spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG_NAME}")
+# spark.sql(f"CREATE CATALOG IF NOT EXISTS {CATALOG_NAME}")
 
 # COMMAND ----------
 
 # DBTITLE 1,grant access to account users
-# Grant create and use catalog permissions for the catalog to all users on the account.
-# This also works for other account-level groups and individual users.
-spark.sql(f"""
-  GRANT CREATE, USE CATALOG
-  ON CATALOG {CATALOG_NAME}
-  TO `account users`""")
+# # Grant create and use catalog permissions for the catalog to all users on the account.
+# # This also works for other account-level groups and individual users.
+# spark.sql(f"""
+#   GRANT CREATE, USE CATALOG
+#   ON CATALOG {CATALOG_NAME}
+#   TO `account users`""")
 
 # COMMAND ----------
 
 # DBTITLE 1,create the schema 
-# Create a schema in the catalog that was set earlier.
-spark.sql(f"""
-  CREATE SCHEMA IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}
-  COMMENT 'schmea for TCGA expression profiles and metadata'""")
+# # Create a schema in the catalog that was set earlier.
+# spark.sql(f"""
+#   CREATE SCHEMA IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}
+#   COMMENT 'schmea for TCGA expression profiles and metadata'""")
 
 # COMMAND ----------
 
 # DBTITLE 1,grant access to the schema
-#grant access to schema
-sql(f"GRANT USE SCHEMA, CREATE TABLE ON SCHEMA {CATALOG_NAME}.{SCHEMA_NAME} TO `account users`")
+# #grant access to schema
+# sql(f"GRANT USE SCHEMA, CREATE TABLE ON SCHEMA {CATALOG_NAME}.{SCHEMA_NAME} TO `account users`")
 
 # COMMAND ----------
 
@@ -206,12 +200,12 @@ sql(f"GRANT USE SCHEMA, CREATE TABLE ON SCHEMA {CATALOG_NAME}.{SCHEMA_NAME} TO `
 # COMMAND ----------
 
 # DBTITLE 1,add cases
-read_cases(staging_path).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.cases')
+read_cases(STAGING_PATH).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.cases')
 
 # COMMAND ----------
 
 # DBTITLE 1,add expression profile information
-read_expression_files_info(staging_path).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.expression_files_info')
+read_expression_files_info(STAGING_PATH).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.expression_files_info')
 
 # COMMAND ----------
 
@@ -236,7 +230,7 @@ extract_cases_exposures(cases_df,expression_files_info_df).write.mode("overwrite
 # COMMAND ----------
 
 # DBTITLE 1,add expression profiles
-expression_profiles_df = read_expression_profiles(staging_path)
+expression_profiles_df = read_expression_profiles(STAGING_PATH)
 expression_profiles_df.write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.expression_profiles')
 
 # COMMAND ----------
@@ -259,3 +253,7 @@ for t in [m.tableName for m in sql(f'show tables in {my_schema}').collect()]:
   GRANT SELECT, MODIFY
   ON TABLE {my_schema}.{t}
   TO `account users`""")
+
+# COMMAND ----------
+
+

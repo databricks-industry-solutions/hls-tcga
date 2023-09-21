@@ -31,9 +31,6 @@ dbutils.widgets.dropdown('sample_label','tissue_or_organ_of_origin',sample_label
 # COMMAND ----------
 
 # DBTITLE 1,set up paths
-staging_path = f"/home/{USER}/{CATALOG_NAME}/{SCHEMA_NAME}/staging"
-expression_files_path = f"{staging_path}/expressions"
-
 database_name = f'{CATALOG_NAME}.{SCHEMA_NAME}'
 print(database_name)
 

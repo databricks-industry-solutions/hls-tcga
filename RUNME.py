@@ -28,6 +28,10 @@
 
 # COMMAND ----------
 
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
 from solacc.companion import NotebookSolutionCompanion
 
 # COMMAND ----------
@@ -128,7 +132,7 @@ job_json = {
             {
                 "job_cluster_key": "tcga_solacc_cluster",
                 "new_cluster": {
-                    "spark_version": "13.0.x-scala2.12",
+                    "spark_version": "13.3.x-scala2.12",
                 "spark_conf": {
                     "spark.databricks.delta.formatCheck.enabled": "false"
                     },
@@ -154,4 +158,3 @@ dbutils.widgets.dropdown("run_job", "False", ["True", "False"])
 run_job = dbutils.widgets.get("run_job") == "True"
 nsc = NotebookSolutionCompanion()
 nsc.deploy_compute(job_json, run_job=run_job)
-_ = nsc.deploy_dbsql("./dashboards/IoT Streaming SA Anomaly Detection.dbdash", dbsql_config_table, spark)

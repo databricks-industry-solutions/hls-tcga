@@ -165,8 +165,18 @@ def get_gene_level_expression_stats(expression_profiles_df):
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ### cases
+
+# COMMAND ----------
+
 # DBTITLE 1,add cases
 read_cases(STAGING_PATH).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.cases')
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### expression_files_info
 
 # COMMAND ----------
 
@@ -180,8 +190,18 @@ expression_files_info_df = sql(f'SELECT * from {CATALOG_NAME}.{SCHEMA_NAME}.expr
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ### demographics
+
+# COMMAND ----------
+
 # DBTITLE 1,add demographics
 extract_cases_demographics(cases_df,expression_files_info_df).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.demographics')
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### diagnosis
 
 # COMMAND ----------
 
@@ -190,8 +210,18 @@ extract_cases_diagnoses(cases_df,expression_files_info_df).write.mode("overwrite
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ### exposures
+
+# COMMAND ----------
+
 # DBTITLE 1,add exposures
 extract_cases_exposures(cases_df,expression_files_info_df).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.exposures')
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### expression profiles
 
 # COMMAND ----------
 
@@ -201,8 +231,18 @@ expression_profiles_df.write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCH
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ### sample level stats
+
+# COMMAND ----------
+
 # DBTITLE 1,add sample level stats
 get_sample_level_expression_stats(expression_profiles_df).write.mode("overwrite").saveAsTable(f'{CATALOG_NAME}.{SCHEMA_NAME}.sample_level_expression_stats')
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### gene-level stats
 
 # COMMAND ----------
 

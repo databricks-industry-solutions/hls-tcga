@@ -37,7 +37,7 @@ print(database_name)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Data Preparation
+# MAGIC ## 1. Data Preparation
 # MAGIC Now we proceed tp prepare expression profiles data for clustering. Note that the tcga expressions are normalized using three commonly used methods:
 # MAGIC
 # MAGIC 1. FPKM 
@@ -69,7 +69,7 @@ gene_stats_df.display()
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Select the Most Variable Genes
+# MAGIC ## 2. Select the Most Variable Genes
 # MAGIC Since we are primarily interested in clustering samples based on their expression counts, we first select a subset of genes that have high variability among different samples and then apply dimensionality reduction on this subset of features.
 
 # COMMAND ----------
@@ -81,7 +81,7 @@ selected_genes = gene_stats_df.orderBy(col('v_fpkm').desc()).limit(20000).select
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Convert Expression Profiles
+# MAGIC ## 3. Convert Expression Profiles
 # MAGIC Now, we transform the expression profiles so that each row corresponds to a given sample, and each column corresponds to the selected genes.
 # MAGIC
 
@@ -113,7 +113,7 @@ expressions_vec_df = expressions_df.join(selected_genes,on='gene_id').transform(
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3. UMAP Plots
+# MAGIC ## 4. UMAP Plots
 # MAGIC Now that the data is ready we can proceed to calculate expression embeddings using UMAP and plot the embeddings. 
 
 # COMMAND ----------

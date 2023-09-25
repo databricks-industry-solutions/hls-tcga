@@ -15,8 +15,11 @@
 
 # COMMAND ----------
 
-# DBTITLE 1,install umap
-# MAGIC %pip install umap-learn
+# MAGIC %pip install umap-learn numpy==1.22
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
 
 # COMMAND ----------
 

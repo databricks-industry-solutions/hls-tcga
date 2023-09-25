@@ -58,7 +58,7 @@ sql(f"GRANT USE SCHEMA, CREATE TABLE ON SCHEMA {CATALOG_NAME}.{SCHEMA_NAME} TO `
 
 sql(f"""
     CREATE VOLUME IF NOT EXISTS {CATALOG_NAME}.{SCHEMA_NAME}.{VOLUME_NAME}
-    COMMENT 'managed volum for tcga files'
+    COMMENT 'managed volum for tcga files'  
     """
     )
 

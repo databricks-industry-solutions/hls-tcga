@@ -114,7 +114,7 @@ job_json = {
                 ]
             },
             {
-                "job_cluster_key": "tcga_solacc_cluster",
+                "job_cluster_key": "tcga_solacc_cluster_umap",
                 "notebook_task": {
                     "notebook_path": f"03-tcga-expression-profiles"
                 },
@@ -133,6 +133,20 @@ job_json = {
                 "job_cluster_key": "tcga_solacc_cluster",
                 "new_cluster": {
                     "spark_version": "13.3.x-scala2.12",
+                "spark_conf": {
+                    "spark.databricks.delta.formatCheck.enabled": "false"
+                    },
+                    "num_workers": 2,
+                    "node_type_id": {"AWS": "i3.xlarge", "MSA": "Standard_DS3_v2", "GCP": "n1-highmem-4"},
+                    "custom_tags": {
+                        "usage": "solacc_testing"
+                    },
+                }
+            },
+            {
+                "job_cluster_key": "tcga_solacc_cluster_umap",
+                "new_cluster": {
+                    "spark_version": "13.2.x-scala2.12",
                 "spark_conf": {
                     "spark.databricks.delta.formatCheck.enabled": "false"
                     },

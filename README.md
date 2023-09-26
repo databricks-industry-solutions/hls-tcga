@@ -11,7 +11,7 @@
 4. Strengthen predictions of cancer recurrence by understanding the genomic modifications in tumors, facilitating the recognition of indicators that signify an increased likelihood of cancer resurgence post-treatment.
 5. Foster new breakthroughs via data sharing. TCGA has adopted a policy of sharing all its data and findings with the global scientific fraternity, promoting independent research, novel discoveries, and the development of improved solutions.
 
-TCGA boasts over [2.5 petabytes of genomic, epigenomic, transcriptomic, and proteomic data spanning 33 cancer types](https://www.cancergenomicscloud.org/access-tcga-dataset#:~:text=The%20Cancer%20Genome%20Atlas%20(TCGA,TCGA%20is%20challenging%20to%20use.). Contributions from over 10,000 patients include tumor samples and matched controls from blood or nearby normal tissues. The Genomic Data Commons offers complete access to this data, and users can visually navigate it using the Integrated Genomics Viewer.
+TCGA boasts over 2.5 petabytes of genomic, epigenomic, transcriptomic, and proteomic data spanning 33 cancer types. Contributions from over 10,000 patients include tumor samples and matched controls from blood or nearby normal tissues. The Genomic Data Commons offers complete access to this data, and users can visually navigate it using the Integrated Genomics Viewer.
 
 TCGA serves as a comprehensive repository of pivotal genomic variations in major cancers, continually propelling significant advancements in cancer biology comprehension. It illuminates the mechanisms underlying tumorigenesis and sets the stage for the next generation of diagnostic and therapeutic methods.
 

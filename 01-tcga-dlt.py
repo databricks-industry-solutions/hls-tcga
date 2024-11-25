@@ -114,6 +114,8 @@ def cases_exposures():
 
 # COMMAND ----------
 
+from pyspark.sql.functions import col
+
 @dlt.create_table(
   comment="expression profiles ingested from files downloaded from GDC API.",
   table_properties={
@@ -143,7 +145,7 @@ def expression_profiles_raw():
       .option("rescuedDataColumn", "_rescued_data") # makes sure that you don't lose data
       .schema(schema) # provide a schema here for the files
       .load(f'{staging_path}/expressions')
-      .withColumn('file_id', substring_index(input_file_name(),'/',-1))
+      .withColumn('file_id', substring_index(col("_metadata.file_path"),'/',-1))
     )
 
   return df

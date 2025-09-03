@@ -15,7 +15,11 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install umap-learn numpy==1.22
+# numpy==1.22 scikit-learn==0.22.2.post1
+
+# COMMAND ----------
+
+# MAGIC %pip install umap-learn==0.5.7 
 
 # COMMAND ----------
 
@@ -23,19 +27,16 @@ dbutils.library.restartPython()
 
 # COMMAND ----------
 
-# MAGIC %run ./util/configurations
+catalog='db_omics_solac'
+schema='tcga_dev'
+database_name = f'{catalog}.{schema}'
+print(database_name)
 
 # COMMAND ----------
 
 # DBTITLE 1,create widgets
 sample_labels = ['primary_diagnosis','tissue_or_organ_of_origin','tumor_grade']
 dbutils.widgets.dropdown('sample_label','tissue_or_organ_of_origin',sample_labels)
-
-# COMMAND ----------
-
-# DBTITLE 1,set up paths
-database_name = f'{CATALOG_NAME}.{SCHEMA_NAME}'
-print(database_name)
 
 # COMMAND ----------
 
@@ -56,18 +57,56 @@ print(database_name)
 
 # COMMAND ----------
 
+#sample-level expression stats: mean and variance for counts
+from pyspark.sql.functions import mean, variance, col
+def get_sample_level_expression_stats(expression_profiles_df):
+    return(
+      expression_profiles_df
+      .groupBy('file_id')
+      .agg(
+          mean(col('fpkm_unstranded')).alias('m_fpkm_unstranded'),
+          variance(col('fpkm_unstranded')).alias('v_fpkm'),
+          mean(col('fpkm_uq_unstranded')).alias('m_uq_fpkm'),
+          variance(col('fpkm_uq_unstranded')).alias('v_uq_fpkm'),
+          mean(col('tpm_unstranded')).alias('m_tpm'),
+          variance(col('tpm_unstranded')).alias('v_tpm'),
+      )
+    )
+  
+  #gene-level expression stats: mean and variance for counts"
+
+def get_gene_level_expression_stats(expression_profiles_df):
+    return(
+      expression_profiles_df
+      .groupBy('gene_id')
+      .agg(
+          mean(col('fpkm_unstranded')).alias('m_fpkm'),
+          variance(col('fpkm_unstranded')).alias('v_fpkm'),
+          mean(col('fpkm_uq_unstranded')).alias('m_uq_fpkm'),
+          variance(col('fpkm_uq_unstranded')).alias('v_uq_fpkm'),
+          mean(col('tpm_unstranded')).alias('m_tpm'),
+          variance(col('tpm_unstranded')).alias('v_tpm'),
+      )
+  )
+
+# COMMAND ----------
+
+expression_profiles_df = spark.read.table(f'{database_name}.expression_profiles')
+
+# COMMAND ----------
+
 # DBTITLE 1,load summary statistics data 
-sample_stats_df= sql(f'select * from {database_name}.sample_level_expression_stats')
-gene_stats_df = sql(f'select * from {database_name}.gene_level_expression_stats')
+sample_stats_df= get_sample_level_expression_stats(expression_profiles_df)
+gene_stats_df = get_gene_level_expression_stats(expression_profiles_df)
 
 # COMMAND ----------
 
 # DBTITLE 1,look at sample-level distributions
-sample_stats_df.display()
+sample_stats_df.limit(10).display()
 
 # COMMAND ----------
 
-gene_stats_df.display()
+gene_stats_df.limit(10).display()
 
 # COMMAND ----------
 
@@ -78,8 +117,8 @@ gene_stats_df.display()
 # COMMAND ----------
 
 from pyspark.sql.functions import col 
-
 selected_genes = gene_stats_df.orderBy(col('v_fpkm').desc()).limit(20000).select('gene_id')
+display(selected_genes.limit(10))
 
 # COMMAND ----------
 
@@ -115,9 +154,40 @@ expressions_vec_df = expressions_df.join(selected_genes,on='gene_id').transform(
 
 # COMMAND ----------
 
+expressions_vec_df.write.mode('overwrite').saveAsTable(f'{database_name}.expression_profiles_vec')
+
+# COMMAND ----------
+
+expressions_vec_df.count()
+
+# COMMAND ----------
+
+expressions_vec_df.limit(10).display()
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## 4. UMAP Plots
 # MAGIC Now that the data is ready we can proceed to calculate expression embeddings using UMAP and plot the embeddings. 
+
+# COMMAND ----------
+
+# MAGIC %pip install umap-learn==0.5.7 
+
+# COMMAND ----------
+
+catalog='db_omics_solac'
+schema='tcga_dev'
+database_name = f'{catalog}.{schema}'
+print(database_name)
+
+# COMMAND ----------
+
+df = sql(f'select * from {database_name}.expression_profiles_vec')
+
+# COMMAND ----------
+
+df.limit(10).display()
 
 # COMMAND ----------
 
@@ -135,6 +205,8 @@ params ={'n_neighbors':n_neighbors,
 # DBTITLE 1,embedding calculation
 def get_embeddings(df,feature_col,params):
   import umap
+  import pandas as pd
+  import numpy as np
   _pdf=df.select('file_id',feature_col).toPandas()
   m=_pdf.shape[0]
   n=len(_pdf[feature_col][0])
@@ -153,8 +225,7 @@ def get_embeddings(df,feature_col,params):
 # COMMAND ----------
 
 # DBTITLE 1,create a pandas on spark dataframe of embeddings 
-import numpy as np
-expression_embedding_spdf = get_embeddings(expressions_vec_df,'fpkm_list',params)
+expression_embedding_spdf = get_embeddings(df,'fpkm_list',params)
 
 # COMMAND ----------
 
@@ -173,9 +244,13 @@ expression_embedding_spdf.head()
 
 # COMMAND ----------
 
-diagnoses_spdf=sql(f'select * from {database_name}.diagnoses').pandas_api()
+diagnoses_spdf=sql(f'select * from {database_name}.cases_diagnoses').pandas_api()
 expression_profiles_diagnoses_spdf = expression_embedding_spdf.merge(diagnoses_spdf, on='file_id')
 expression_profiles_diagnoses_spdf.head()
+
+# COMMAND ----------
+
+expression_profiles_diagnoses_spdf.to_spark().write.mode("overWrite").saveAsTable(f'{database_name}.expression_profiles_umap')
 
 # COMMAND ----------
 

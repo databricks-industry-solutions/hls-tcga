@@ -18,15 +18,12 @@ TCGA serves as a comprehensive repository of pivotal genomic variations in major
 ## Workflow Overview
 Within this solution accelerator, we present a template illustrating the ease with which one can load RNA expression profiles from [TCGA](https://portal.gdc.cancer.gov/) and associated clinical data into the Databricks lakehouse platform, and subsequently perform diverse analyses on the dataset. Specifically, we demonstrate how to construct a database of gene expression profiles combined with pertinent metadata and manage all data assets, including raw files, using [Unity Catalog (UC)](https://www.databricks.com/product/unity-catalog). Below is an outline of the workflow:
 
+- First run [setup](./setup) notebook to create the catalogue, schema and associated volume to store raw data
 - Initially, RNA expression profiles and clinical metadata are downloaded using the [00-data-download](./00-data-download) notebook. This action leverages [GDC APIs](https://gdc.cancer.gov/access-data/gdc-data-transfer-tool) to store the data into a [managed volume](https://docs.databricks.com/en/data-governance/unity-catalog/create-volumes.html), a Unity Catalog-governed storage volume housed in the schema's default storage location.
 
-- Subsequently, in the [01-tcga-etl](./01-tcga-etl) notebook, we establish tables and publish them to Unity Catalog. Alternatively, [01-tcga-dlt](https://github.com/databricks-industry-solutions/hls-tcga/blob/main/01-tcga-dlt.py) can be employed to accomplish the same tasks using DLT pipelines.
+- Subsequently, in the [etl_pipelines](./etl_pipelines), we establish tables and publish them to Unity Catalog using [Lakeflow ETL](https://www.databricks.com/product/data-engineering/lakeflow-declarative-pipelines) pipelines.
 
-- In [02-rna-tcga-analysis](./02-rna-tcga-analysis), we provide examples illustrating data exploration using `sql` and `pyspark-ai` to interact with the tables through natural language. 
-
-<img src="https://hls-eng-data-public.s3.amazonaws.com/img/tcga-umap.png" width=500 >
-
-- In the subsequent phase, within [03-rna-tcga-expression-profiles](./03-rna-tcga-expression-profiles), we curate a dataset of normalized gene expressions for each sample. We then select the most variable features, apply UMAP dimensionality reduction to these features for data visualization, and design an interactive dashboard for exploratory RNA cluster analysis.
+- In the subsequent phase, within [01-rna-tcga-expression-profiles](./01-rna-tcga-expression-profiles), we curate a dataset of normalized gene expressions for each sample. We then select the most variable features, apply UMAP dimensionality reduction to these features for data visualization, and design an interactive dashboard for exploratory RNA cluster analysis.
 
 ### Workflow
 

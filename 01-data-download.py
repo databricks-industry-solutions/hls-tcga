@@ -81,7 +81,7 @@ def download_single_expression(
 def download_expressions(
     target_directory_path,
     uuids,
-    n_workers=32
+    n_workers=64
 ):
     params = [
         (uid, target_directory_path)

@@ -17,7 +17,7 @@
 
 # COMMAND ----------
 
-# MAGIC %run ./setup
+# MAGIC %run ./00-setup
 
 # COMMAND ----------
 

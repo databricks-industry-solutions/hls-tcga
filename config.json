@@ -1,7 +1,7 @@
 {
   "lakehouse": {
-    "catalog": "db_omics_solac",
-    "schema": "tcga_dev",
+    "catalog": "rnd_workshop",
+    "schema": "tcga",
     "volume": "tcga_files"
   },
   "api_paths": {

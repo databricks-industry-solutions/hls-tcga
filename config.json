@@ -1,0 +1,12 @@
+{
+  "lakehouse": {
+    "catalog": "rnd_workshop",
+    "schema": "tcga",
+    "volume": "tcga_files"
+  },
+  "api_paths": {
+    "cases_endpt": "https://api.gdc.cancer.gov/cases",
+    "files_endpt": "https://api.gdc.cancer.gov/files",
+    "data_endpt": "https://api.gdc.cancer.gov/data/"
+  }
+}

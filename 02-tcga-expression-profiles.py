@@ -15,27 +15,27 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install umap-learn numpy==1.22
+import os
+import json
+from pyspark.sql.functions import expr
 
-# COMMAND ----------
+# Determine the absolute path to the JSON file
+config_path = os.path.abspath('./config.json')
 
-dbutils.library.restartPython()
+# Load configurations from the JSON file
+with open(config_path, 'r') as file:
+    config = json.load(file)
 
-# COMMAND ----------
-
-# MAGIC %run ./util/configurations
-
-# COMMAND ----------
-
-# DBTITLE 1,create widgets
-sample_labels = ['primary_diagnosis','tissue_or_organ_of_origin','tumor_grade']
-dbutils.widgets.dropdown('sample_label','tissue_or_organ_of_origin',sample_labels)
-
-# COMMAND ----------
-
-# DBTITLE 1,set up paths
-database_name = f'{CATALOG_NAME}.{SCHEMA_NAME}'
-print(database_name)
+# Access the configurations
+catalog = config['lakehouse']['catalog']
+schema = config['lakehouse']['schema']
+volume = config['lakehouse']['volume']
+volume_path = f'/Volumes/{catalog}/{schema}/{volume}'
+database_name = f'{catalog}.{schema}'
+user_id = spark.sql('SELECT session_user() AS user').select(expr("regexp_replace(split(user, '@')[0], '\\\.', '_') AS user_id")).collect()[0]['user_id']
+user_id
+# Print or use the configurations as needed
+print(catalog, schema, volume, database_name)
 
 # COMMAND ----------
 
@@ -56,18 +56,61 @@ print(database_name)
 
 # COMMAND ----------
 
-# DBTITLE 1,load summary statistics data 
-sample_stats_df= sql(f'select * from {database_name}.sample_level_expression_stats')
-gene_stats_df = sql(f'select * from {database_name}.gene_level_expression_stats')
+# MAGIC %md
+# MAGIC ### Function Definitions
+# MAGIC In the following cells, we define two functions to calculate sample-level and gene-level summary statistics of the expressions. 
 
 # COMMAND ----------
 
-# DBTITLE 1,look at sample-level distributions
-sample_stats_df.display()
+#sample-level expression stats: mean and variance for counts
+from pyspark.sql.functions import mean, variance, col
+def get_sample_level_expression_stats(expression_profiles_df):
+    return(
+      expression_profiles_df
+      .groupBy('file_id')
+      .agg(
+          mean(col('fpkm_unstranded')).alias('m_fpkm_unstranded'),
+          variance(col('fpkm_unstranded')).alias('v_fpkm'),
+          mean(col('fpkm_uq_unstranded')).alias('m_uq_fpkm'),
+          variance(col('fpkm_uq_unstranded')).alias('v_uq_fpkm'),
+          mean(col('tpm_unstranded')).alias('m_tpm'),
+          variance(col('tpm_unstranded')).alias('v_tpm'),
+      )
+    )
+  
+  #gene-level expression stats: mean and variance for counts"
+
+def get_gene_level_expression_stats(expression_profiles_df):
+    return(
+      expression_profiles_df
+      .groupBy('gene_id')
+      .agg(
+          mean(col('fpkm_unstranded')).alias('m_fpkm'),
+          variance(col('fpkm_unstranded')).alias('v_fpkm'),
+          mean(col('fpkm_uq_unstranded')).alias('m_uq_fpkm'),
+          variance(col('fpkm_uq_unstranded')).alias('v_uq_fpkm'),
+          mean(col('tpm_unstranded')).alias('m_tpm'),
+          variance(col('tpm_unstranded')).alias('v_tpm'),
+      )
+  )
 
 # COMMAND ----------
 
-gene_stats_df.display()
+# MAGIC %md
+# MAGIC ### Load expression profiles
+
+# COMMAND ----------
+
+expression_profiles_df = spark.read.table(f'{database_name}.expression_profiles')
+expression_profiles_df.limit(10).display()
+print(expression_profiles_df.count())
+
+# COMMAND ----------
+
+sample_stats_df= get_sample_level_expression_stats(expression_profiles_df)
+gene_stats_df = get_gene_level_expression_stats(expression_profiles_df)
+sample_stats_df.limit(10).display()
+gene_stats_df.limit(10).display()
 
 # COMMAND ----------
 
@@ -78,14 +121,14 @@ gene_stats_df.display()
 # COMMAND ----------
 
 from pyspark.sql.functions import col 
-
 selected_genes = gene_stats_df.orderBy(col('v_fpkm').desc()).limit(20000).select('gene_id')
+selected_genes.count()
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 3. Convert Expression Profiles
-# MAGIC Now, we transform the expression profiles so that each row corresponds to a given sample, and each column corresponds to the selected genes.
+# MAGIC Now, we transform the expression profiles so that each row corresponds to a given sample, with expressions collected as arrays corresponding to the selected genes.
 # MAGIC
 
 # COMMAND ----------
@@ -112,6 +155,7 @@ def get_expression_lists(df: DataFrame) -> DataFrame:
 
 expressions_df=sql(f'select * from {database_name}.expression_profiles')
 expressions_vec_df = expressions_df.join(selected_genes,on='gene_id').transform(get_expression_lists)
+expressions_vec_df.write.mode('overwrite').saveAsTable(f'{database_name}.{user_id}_expression_profiles_vec')
 
 # COMMAND ----------
 
@@ -121,20 +165,54 @@ expressions_vec_df = expressions_df.join(selected_genes,on='gene_id').transform(
 
 # COMMAND ----------
 
-# DBTITLE 1,UMAP parameters 
-n_neighbors=15
-min_dist=0.1
-n_components = 2
-params ={'n_neighbors':n_neighbors,
-               'min_dist':min_dist,
-               'n_components':n_components,
-          }
+# MAGIC %pip install umap-learn==0.5.7 
+# MAGIC dbutils.library.restartPython()
+
+# COMMAND ----------
+
+import os
+import json
+from pyspark.sql.functions import expr
+
+# Determine the absolute path to the JSON file
+config_path = os.path.abspath('./config.json')
+
+# Load configurations from the JSON file
+with open(config_path, 'r') as file:
+    config = json.load(file)
+
+# Access the configurations
+catalog = config['lakehouse']['catalog']
+schema = config['lakehouse']['schema']
+volume = config['lakehouse']['volume']
+volume_path = f'/Volumes/{catalog}/{schema}/{volume}'
+database_name = f'{catalog}.{schema}'
+user_id = spark.sql('SELECT session_user() AS user').select(expr("regexp_replace(split(user, '@')[0], '\\\.', '_') AS user_id")).collect()[0]['user_id']
+# Print or use the configurations as needed
+print(catalog, schema, volume, database_name,user_id)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Read Modified Expression Profiles
+
+# COMMAND ----------
+
+expressions_vec_df=spark.read.table(f'{database_name}.{user_id}_expression_profiles_vec')
+
+# COMMAND ----------
+
+n_genes=expressions_vec_df.limit(1).selectExpr('size(fpkm_list) as len').collect()[0]['len']
+n_samples=expressions_vec_df.count()
+print(n_samples,n_genes)
 
 # COMMAND ----------
 
 # DBTITLE 1,embedding calculation
 def get_embeddings(df,feature_col,params):
   import umap
+  import pandas as pd
+  import numpy as np
   _pdf=df.select('file_id',feature_col).toPandas()
   m=_pdf.shape[0]
   n=len(_pdf[feature_col][0])
@@ -152,8 +230,17 @@ def get_embeddings(df,feature_col,params):
 
 # COMMAND ----------
 
+n_neighbors=15
+min_dist=0.1
+n_components = 2
+params ={'n_neighbors':n_neighbors,
+               'min_dist':min_dist,
+               'n_components':n_components,
+          }
+
+# COMMAND ----------
+
 # DBTITLE 1,create a pandas on spark dataframe of embeddings 
-import numpy as np
 expression_embedding_spdf = get_embeddings(expressions_vec_df,'fpkm_list',params)
 
 # COMMAND ----------
@@ -173,9 +260,13 @@ expression_embedding_spdf.head()
 
 # COMMAND ----------
 
-diagnoses_spdf=sql(f'select * from {database_name}.diagnoses').pandas_api()
+diagnoses_spdf=sql(f'select * from {database_name}.cases_diagnoses').pandas_api()
 expression_profiles_diagnoses_spdf = expression_embedding_spdf.merge(diagnoses_spdf, on='file_id')
 expression_profiles_diagnoses_spdf.head()
+
+# COMMAND ----------
+
+expression_profiles_diagnoses_spdf.to_spark().write.mode("overWrite").saveAsTable(f'{database_name}.{user_id}_expression_profiles_umap')
 
 # COMMAND ----------
 
@@ -185,7 +276,12 @@ expression_profiles_diagnoses_spdf.head()
 
 # COMMAND ----------
 
-expression_profiles_diagnoses_spdf.display()
+expression_profiles_diagnoses_spdf.head(10).display()
+
+# COMMAND ----------
+
+sample_labels = ['primary_diagnosis','tissue_or_organ_of_origin','tumor_grade']
+dbutils.widgets.dropdown('sample_label','tissue_or_organ_of_origin',sample_labels)
 
 # COMMAND ----------
 

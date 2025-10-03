@@ -17,6 +17,7 @@ catalog = config['lakehouse']['catalog']
 schema = config['lakehouse']['schema']
 volume = config['lakehouse']['volume']
 # entity_csv_schema = spark.conf.get("mypipeline.entity_csv_schema")
+
 volume_path = f'/Volumes/{catalog}/{schema}/{volume}'
 
 @dlt.table

@@ -126,10 +126,11 @@ print(f"Infinite values: {np.isinf(X_scaled).sum()}")
 
 # COMMAND ----------
 
-# Apply PCA to the standardized data
+from sklearn.decomposition import PCA
+import numpy as np
+
 print("Applying PCA to standardized expression data...")
 
-# Start with 50 components to capture most variance
 n_components = 50
 pca = PCA(n_components=n_components, random_state=42)
 X_pca = pca.fit_transform(X_scaled)
@@ -137,7 +138,6 @@ X_pca = pca.fit_transform(X_scaled)
 print(f"PCA transformed data shape: {X_pca.shape}")
 print(f"Number of components: {pca.n_components_}")
 
-# Calculate explained variance
 explained_variance_ratio = pca.explained_variance_ratio_
 cumulative_variance = np.cumsum(explained_variance_ratio)
 
@@ -162,6 +162,8 @@ print(f"All {n_components} components: {cumulative_variance[-1]:.4f} ({cumulativ
 # MAGIC * Summary of variance explained by top PCs
 
 # COMMAND ----------
+
+import matplotlib.pyplot as plt
 
 # Create comprehensive PCA visualizations
 fig, axes = plt.subplots(2, 2, figsize=(15, 12))
@@ -347,8 +349,9 @@ tsne_top = tsne_df_merged[tsne_df_merged['tissue_or_organ_of_origin'].isin(top_t
 kmeans = KMeans(n_clusters=20, random_state=42)
 tsne_top['kmeans_cluster'] = kmeans.fit_predict(tsne_top[['tsne_1', 'tsne_2']].values)
 
-display(tsne_top)
-
+display(tsne_top[:10])
+tsne_top_spark_df = spark.createDataFrame(tsne_top)
+tsne_top_spark_df.write.mode("overwrite").saveAsTable(f"{database_name}.tsne_top")
 # Visualize: color by tissue type using Plotly Express
 fig = px.scatter(
     tsne_top,
@@ -364,3 +367,7 @@ fig = px.scatter(
 fig.update_traces(marker=dict(size=3, opacity=0.7))
 fig.update_layout(legend=dict(itemsizing='constant', font=dict(size=10)))
 fig.show()
+
+# COMMAND ----------
+
+

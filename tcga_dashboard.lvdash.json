@@ -1,0 +1,749 @@
+{
+  "datasets": [
+    {
+      "name": "465d0d69",
+      "displayName": "cases_diagnoses",
+      "queryLines": [
+        "SELECT * FROM db_omics_solacc.tcga.cases_diagnoses"
+      ]
+    },
+    {
+      "name": "6810886a",
+      "displayName": "cases_exposures",
+      "queryLines": [
+        "SELECT \n",
+        "  e.alcohol_history, \n",
+        "  e.years_smoked, \n",
+        "  d.ethnicity, \n",
+        "  d.gender, \n",
+        "  d.race, \n",
+        "  d.year_of_birth, \n",
+        "  d.year_of_death,\n",
+        "  f.primary_diagnosis,\n",
+        "  CASE \n",
+        "    WHEN d.year_of_death IS NOT NULL THEN d.year_of_death - d.year_of_birth\n",
+        "    ELSE YEAR(current_date()) - d.year_of_birth\n",
+        "  END AS age\n",
+        "FROM db_omics_solacc.tcga.cases_exposures e\n",
+        "JOIN db_omics_solacc.tcga.cases_demographics d\n",
+        "  ON e.case_id = d.case_id\n",
+        "LEFT JOIN db_omics_solacc.tcga.cases_diagnoses f \n",
+        "  ON f.case_id = d.case_id\n",
+        "WHERE f.primary_diagnosis IS NOT NULL"
+      ],
+      "catalog": "db_omics_solacc",
+      "schema": "tcga"
+    },
+    {
+      "name": "28ef8382",
+      "displayName": "tsne_top",
+      "queryLines": [
+        "SELECT \n",
+        "  t.*, \n",
+        "  d.primary_diagnosis,\n",
+        "  demo.gender\n",
+        "FROM db_omics_solacc.tcga.tsne_top t\n",
+        "LEFT JOIN db_omics_solacc.tcga.cases_diagnoses d\n",
+        "  ON t.file_id = d.file_id\n",
+        "LEFT JOIN db_omics_solacc.tcga.cases_demographics demo\n",
+        "  ON d.case_id = demo.case_id"
+      ]
+    },
+    {
+      "name": "002a3e18",
+      "displayName": "average_age",
+      "queryLines": [
+        "SELECT \n",
+        "  f.primary_diagnosis,\n",
+        "  d.race,\n",
+        "  d.gender,\n",
+        "  COUNT(*) AS n_cases,\n",
+        "  AVG(\n",
+        "    CASE \n",
+        "      WHEN d.year_of_death IS NOT NULL THEN d.year_of_death - d.year_of_birth\n",
+        "      ELSE YEAR(current_date()) - d.year_of_birth\n",
+        "    END\n",
+        "  ) AS avg_age\n",
+        "FROM db_omics_solacc.tcga.cases_demographics d\n",
+        "LEFT JOIN db_omics_solacc.tcga.cases_diagnoses f \n",
+        "  ON f.case_id = d.case_id\n",
+        "WHERE f.primary_diagnosis IS NOT NULL\n",
+        "GROUP BY f.primary_diagnosis, d.race, d.gender\n",
+        "ORDER BY n_cases DESC\n",
+        "LIMIT 20"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "476b3547",
+      "displayName": "Primary Diagnosis",
+      "layout": [
+        {
+          "widget": {
+            "name": "bb84adaa",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6810886a",
+                  "fields": [
+                    {
+                      "name": "gender",
+                      "expression": "`gender`"
+                    },
+                    {
+                      "name": "primary_diagnosis",
+                      "expression": "`primary_diagnosis`"
+                    },
+                    {
+                      "name": "count(primary_diagnosis)",
+                      "expression": "COUNT(`primary_diagnosis`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "primary_diagnosis",
+                  "scale": {
+                    "type": "categorical",
+                    "categorySize": {
+                      "type": "number-of-categories",
+                      "number": 20
+                    },
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  },
+                  "axis": {
+                    "labelAngle": 90
+                  }
+                },
+                "y": {
+                  "fieldName": "count(primary_diagnosis)",
+                  "scale": {
+                    "type": "quantitative",
+                    "domain": {
+                      "min": 200
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "gender",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "title": "Top 20 Primary Diagnoses by Count",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "a556efef",
+            "queries": [
+              {
+                "name": "dashboards/01f0a084adbf1343ae7d32a637ffde92/datasets/01f0a085e44e13a98c5fee5201f1d514_race",
+                "query": {
+                  "datasetName": "6810886a",
+                  "fields": [
+                    {
+                      "name": "race",
+                      "expression": "`race`"
+                    },
+                    {
+                      "name": "race_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "race",
+                    "queryName": "dashboards/01f0a084adbf1343ae7d32a637ffde92/datasets/01f0a085e44e13a98c5fee5201f1d514_race"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": "Race"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "564d46f3",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "002a3e18",
+                  "fields": [
+                    {
+                      "name": "primary_diagnosis",
+                      "expression": "`primary_diagnosis`"
+                    },
+                    {
+                      "name": "avg(avg_age)",
+                      "expression": "AVG(`avg_age`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "primary_diagnosis",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(avg_age)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "title": "Age ",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "cac584eb",
+            "queries": [
+              {
+                "name": "dashboards/01f0a084adbf1343ae7d32a637ffde92/datasets/01f0a088c2fd18d7a5cf431966e8c55e_gender",
+                "query": {
+                  "datasetName": "002a3e18",
+                  "fields": [
+                    {
+                      "name": "gender",
+                      "expression": "`gender`"
+                    },
+                    {
+                      "name": "gender_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "gender",
+                    "queryName": "dashboards/01f0a084adbf1343ae7d32a637ffde92/datasets/01f0a088c2fd18d7a5cf431966e8c55e_gender"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 1,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "0f5fa446",
+            "multilineTextboxSpec": {
+              "lines": [
+                "<span style=\"font-size: 24px;\">Primary Diagnosis Insights</span>"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 1
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "34496147",
+      "displayName": "Demographics",
+      "layout": [
+        {
+          "widget": {
+            "name": "455d4d2a",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6810886a",
+                  "fields": [
+                    {
+                      "name": "count(gender)",
+                      "expression": "COUNT(`gender`)"
+                    },
+                    {
+                      "name": "gender",
+                      "expression": "`gender`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(gender)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "gender",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "title": "Gender Distribution",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "1d19317d",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6810886a",
+                  "fields": [
+                    {
+                      "name": "gender",
+                      "expression": "`gender`"
+                    },
+                    {
+                      "name": "min(age)",
+                      "expression": "MIN(`age`)"
+                    },
+                    {
+                      "name": "q1(age)",
+                      "expression": "PERCENTILE(`age`, 0.25)"
+                    },
+                    {
+                      "name": "median(age)",
+                      "expression": "MEDIAN(`age`)"
+                    },
+                    {
+                      "name": "q3(age)",
+                      "expression": "PERCENTILE(`age`, 0.75)"
+                    },
+                    {
+                      "name": "max(age)",
+                      "expression": "MAX(`age`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "box",
+              "encodings": {
+                "x": {
+                  "fieldName": "gender",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "whiskerStart": {
+                    "fieldName": "min(age)"
+                  },
+                  "boxStart": {
+                    "fieldName": "q1(age)"
+                  },
+                  "boxMid": {
+                    "fieldName": "median(age)"
+                  },
+                  "boxEnd": {
+                    "fieldName": "q3(age)"
+                  },
+                  "whiskerEnd": {
+                    "fieldName": "max(age)"
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "16fb35ae",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6810886a",
+                  "fields": [
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    },
+                    {
+                      "name": "ethnicity",
+                      "expression": "`ethnicity`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(*)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "ethnicity",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "d9fbbcfe",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6810886a",
+                  "fields": [
+                    {
+                      "name": "gender",
+                      "expression": "`gender`"
+                    },
+                    {
+                      "name": "bin(age, binWidth=10)",
+                      "expression": "BIN_FLOOR(`age`, 10)"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "histogram",
+              "encodings": {
+                "x": {
+                  "fieldName": "bin(age, binWidth=10)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(*)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "gender",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 5,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "a2c0f648",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6810886a",
+                  "fields": [
+                    {
+                      "name": "race",
+                      "expression": "`race`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "color": {
+                  "fieldName": "race",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "1548c94a",
+      "displayName": "Expression Clusters",
+      "layout": [
+        {
+          "widget": {
+            "name": "0fc15b37",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "28ef8382",
+                  "fields": [
+                    {
+                      "name": "kmeans_cluster",
+                      "expression": "`kmeans_cluster`"
+                    },
+                    {
+                      "name": "tissue_or_organ_of_origin",
+                      "expression": "`tissue_or_organ_of_origin`"
+                    },
+                    {
+                      "name": "tsne_1",
+                      "expression": "`tsne_1`"
+                    },
+                    {
+                      "name": "tsne_2",
+                      "expression": "`tsne_2`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "scatter",
+              "encodings": {
+                "x": {
+                  "fieldName": "tsne_1",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "tsne_2",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "kmeans_cluster",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "tissue_or_organ_of_origin"
+                  }
+                ]
+              },
+              "mark": {
+                "size": -3
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 6,
+            "height": 11
+          }
+        },
+        {
+          "widget": {
+            "name": "87b14f12",
+            "queries": [
+              {
+                "name": "dashboards/01f0a084adbf1343ae7d32a637ffde92/datasets/01f0a085e4891b84bf5c58f772ca6074_gender",
+                "query": {
+                  "datasetName": "28ef8382",
+                  "fields": [
+                    {
+                      "name": "gender",
+                      "expression": "`gender`"
+                    },
+                    {
+                      "name": "gender_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "gender",
+                    "queryName": "dashboards/01f0a084adbf1343ae7d32a637ffde92/datasets/01f0a085e4891b84bf5c58f772ca6074_gender"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 1
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    }
+  }
+}

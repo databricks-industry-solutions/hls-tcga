@@ -1,6 +1,6 @@
 {
   "lakehouse": {
-    "catalog": "rnd_workshop",
+    "catalog": "db_omics_solacc",
     "schema": "tcga",
     "volume": "tcga_files"
   },

@@ -739,6 +739,61 @@
         }
       ],
       "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "32589297",
+      "displayName": "Untitled page",
+      "layout": [
+        {
+          "widget": {
+            "name": "4c709d29",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6810886a",
+                  "fields": [
+                    {
+                      "name": "sum(age)",
+                      "expression": "SUM(`age`)"
+                    },
+                    {
+                      "name": "ethnicity",
+                      "expression": "`ethnicity`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "sum(age)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "ethnicity",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 2,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
     }
   ],
   "uiSettings": {

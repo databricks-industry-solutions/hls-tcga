@@ -1,0 +1,69 @@
+# DLT Pipeline definitions for TCGA project
+
+resources:
+  pipelines:
+    # Main TCGA data ingestion and transformation pipeline
+    tcga_etl_pipeline:
+      name: "[${bundle.target}] TCGA ETL Pipeline"
+
+      # Target schema for tables
+      target: "${var.catalog_name}.${var.schema_name}"
+
+      # Libraries (DLT notebooks)
+      libraries:
+        - notebook:
+            path: ./etl_pipelines/transformations/data_ingestion.py
+        - notebook:
+            path: ./etl_pipelines/transformations/transform.py
+
+      # Cluster configuration
+      clusters:
+        - label: "default"
+          autoscale:
+            min_workers: 1
+            max_workers: 4
+            mode: ENHANCED
+          node_type_id: "${var.cluster_node_type}"
+          spark_conf:
+            spark.databricks.delta.optimizeWrite.enabled: "true"
+            spark.databricks.delta.autoCompact.enabled: "true"
+
+      # Pipeline configuration
+      configuration:
+        catalog: "${var.catalog_name}"
+        schema: "${var.schema_name}"
+        volume: "${var.volume_name}"
+        pipelines.applyChangesPreviewEnabled: "true"
+
+      # Development mode settings
+      development: ${{ targets.dev.mode == 'development' }}
+
+      # Continuous execution (disabled by default, enable for streaming)
+      continuous: false
+
+      # Channel (preview or current)
+      channel: "CURRENT"
+
+      # Edition (core, pro, advanced)
+      edition: "ADVANCED"
+
+      # Photon acceleration
+      photon: true
+
+      # Storage location for pipeline metadata and checkpoints
+      storage: "/mnt/dlt/${bundle.target}/tcga_pipeline"
+
+      # Notifications (optional)
+      notifications:
+        - alerts:
+            - "on-update-failure"
+            - "on-update-fatal-failure"
+          email_recipients:
+            - "${DATABRICKS_USER_EMAIL}"
+
+      # Permissions
+      permissions:
+        - level: CAN_MANAGE
+          group_name: "data-engineering"
+        - level: CAN_VIEW
+          group_name: "data-analysts"

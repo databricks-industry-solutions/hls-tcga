@@ -1,8 +1,8 @@
 {
   "lakehouse": {
-    "catalog": "<CHANGE TO YOUR CATALOG NAME>",
-    "schema": "tcga",
-    "volume": "tcga_files"
+    "catalog": "staging_catalog",
+    "schema": "tcga_staging",
+    "volume": "tcga_files_staging"
   },
   "api_paths": {
     "cases_endpt": "https://api.gdc.cancer.gov/cases",
@@ -10,8 +10,8 @@
     "data_endpt": "https://api.gdc.cancer.gov/data/"
   },
   "pipeline": {
-    "max_workers": 64,
-    "max_records": 20000,
+    "max_workers": 48,
+    "max_records": 10000,
     "force_download": false,
     "retry_attempts": 3,
     "timeout_seconds": 300

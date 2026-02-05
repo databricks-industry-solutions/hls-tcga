@@ -1,6 +1,21 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC **NOTE**: This notebook is created in collaboration with [Databricks Data Science Agent](https://www.databricks.com/blog/introducing-databricks-assistant-data-science-agent)
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ⚠️ **IMPORTANT**: For production workloads and large datasets, please use the optimized version:
+# MAGIC **`02-tcga-expression-clustering-optimized.py`**
+# MAGIC
+# MAGIC The optimized version includes:
+# MAGIC - Memory-efficient processing (keeps data in Spark longer)
+# MAGIC - MLflow experiment tracking
+# MAGIC - Widget-based parameterization
+# MAGIC - Data size validation before pandas conversion
+# MAGIC - Checkpointing for reproducibility
+# MAGIC - Better error handling
+# MAGIC
+# MAGIC ---
 
 # COMMAND ----------
 

@@ -1,0 +1,159 @@
+# Job definitions for TCGA project
+
+resources:
+  jobs:
+    # Complete TCGA data pipeline workflow
+    tcga_data_workflow:
+      name: "[${bundle.target}] TCGA Data Workflow"
+
+      # Job clusters
+      job_clusters:
+        - job_cluster_key: "data_download_cluster"
+          new_cluster:
+            num_workers: 4
+            node_type_id: "${var.cluster_node_type}"
+            spark_version: "14.3.x-scala2.12"
+            spark_conf:
+              spark.databricks.delta.preview.enabled: "true"
+            data_security_mode: "USER_ISOLATION"
+
+        - job_cluster_key: "analysis_cluster"
+          new_cluster:
+            autoscale:
+              min_workers: 2
+              max_workers: 8
+            node_type_id: "${var.cluster_node_type}"
+            spark_version: "14.3.x-cpu-ml-scala2.12"
+            spark_conf:
+              spark.databricks.delta.preview.enabled: "true"
+            data_security_mode: "USER_ISOLATION"
+
+      # Job tasks
+      tasks:
+        # Task 1: Setup Unity Catalog resources
+        - task_key: "setup"
+          job_cluster_key: "data_download_cluster"
+          notebook_task:
+            notebook_path: ./00-setup.ipynb
+            base_parameters:
+              catalog: "${var.catalog_name}"
+              schema: "${var.schema_name}"
+              volume: "${var.volume_name}"
+          timeout_seconds: 600
+
+        # Task 2: Download data from GDC
+        - task_key: "download_data"
+          depends_on:
+            - task_key: "setup"
+          job_cluster_key: "data_download_cluster"
+          notebook_task:
+            notebook_path: ./01-data-download.py
+            base_parameters:
+              force_download: "false"
+              max_workers: "${var.max_workers}"
+              max_records: "20000"
+          timeout_seconds: 14400  # 4 hours
+          max_retries: 2
+          retry_on_timeout: true
+
+        # Task 3: Run DLT pipeline
+        - task_key: "run_dlt_pipeline"
+          depends_on:
+            - task_key: "download_data"
+          pipeline_task:
+            pipeline_id: "${resources.pipelines.tcga_etl_pipeline.id}"
+            full_refresh: false
+
+        # Task 4: Run expression clustering analysis
+        - task_key: "expression_clustering"
+          depends_on:
+            - task_key: "run_dlt_pipeline"
+          job_cluster_key: "analysis_cluster"
+          notebook_task:
+            notebook_path: ./02-tcga-expression-clustering.py
+          timeout_seconds: 7200  # 2 hours
+
+      # Schedule (daily at 2 AM)
+      schedule:
+        quartz_cron_expression: "0 0 2 * * ?"
+        timezone_id: "America/Los_Angeles"
+        pause_status: "PAUSED"  # Start paused, enable manually
+
+      # Email notifications
+      email_notifications:
+        on_start:
+          - "${DATABRICKS_USER_EMAIL}"
+        on_success:
+          - "${DATABRICKS_USER_EMAIL}"
+        on_failure:
+          - "${DATABRICKS_USER_EMAIL}"
+        no_alert_for_skipped_runs: true
+
+      # Timeout for entire job
+      timeout_seconds: 28800  # 8 hours
+
+      # Max concurrent runs
+      max_concurrent_runs: 1
+
+      # Format
+      format: MULTI_TASK
+
+      # Permissions
+      permissions:
+        - level: CAN_MANAGE
+          group_name: "data-engineering"
+        - level: CAN_VIEW
+          group_name: "data-analysts"
+
+    # Incremental data refresh job (for periodic updates)
+    tcga_incremental_refresh:
+      name: "[${bundle.target}] TCGA Incremental Refresh"
+
+      job_clusters:
+        - job_cluster_key: "refresh_cluster"
+          new_cluster:
+            autoscale:
+              min_workers: 2
+              max_workers: 6
+            node_type_id: "${var.cluster_node_type}"
+            spark_version: "14.3.x-scala2.12"
+            data_security_mode: "USER_ISOLATION"
+
+      tasks:
+        # Download only new data
+        - task_key: "download_new_data"
+          job_cluster_key: "refresh_cluster"
+          notebook_task:
+            notebook_path: ./01-data-download.py
+            base_parameters:
+              force_download: "false"
+              max_workers: "32"
+              max_records: "5000"
+          timeout_seconds: 3600
+
+        # Incremental DLT pipeline refresh
+        - task_key: "incremental_pipeline_refresh"
+          depends_on:
+            - task_key: "download_new_data"
+          pipeline_task:
+            pipeline_id: "${resources.pipelines.tcga_etl_pipeline.id}"
+            full_refresh: false
+
+      # Schedule (weekly on Sunday at 3 AM)
+      schedule:
+        quartz_cron_expression: "0 0 3 ? * SUN"
+        timezone_id: "America/Los_Angeles"
+        pause_status: "PAUSED"
+
+      email_notifications:
+        on_failure:
+          - "${DATABRICKS_USER_EMAIL}"
+        no_alert_for_skipped_runs: true
+
+      timeout_seconds: 7200  # 2 hours
+      max_concurrent_runs: 1
+      format: MULTI_TASK
+
+      permissions:
+        - level: CAN_MANAGE
+          group_name: "data-engineering"

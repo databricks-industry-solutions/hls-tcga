@@ -1,0 +1,97 @@
+# Databricks Asset Bundle configuration for TCGA project
+# This file defines resources and deployment settings for the TCGA data pipeline
+
+bundle:
+  name: tcga-pipeline
+
+include:
+  - resources/*.yml
+
+# Variables that can be overridden per environment
+variables:
+  catalog_name:
+    description: Unity Catalog name
+    default: "main"
+
+  schema_name:
+    description: Schema name within the catalog
+    default: "tcga"
+
+  volume_name:
+    description: Volume name for raw data storage
+    default: "tcga_files"
+
+  cluster_node_type:
+    description: Node type for compute clusters
+    default: "i3.xlarge"
+
+  max_workers:
+    description: Maximum number of workers for data download
+    default: 64
+
+# Workspace configuration
+workspace:
+  host: "${DATABRICKS_HOST}"
+
+# Artifacts to sync to workspace
+artifacts:
+  notebooks:
+    path: .
+    files:
+      - source: "00-setup.ipynb"
+      - source: "01-data-download.py"
+      - source: "02-tcga-expression-clustering.py"
+      - source: "config.json"
+      - source: "config/*.py"
+      - source: "etl_pipelines/**/*.py"
+
+# Targets for different environments
+targets:
+  # Development environment
+  dev:
+    mode: development
+    default: true
+    workspace:
+      root_path: ~/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog_name: "dev_catalog"
+      schema_name: "tcga_dev"
+      volume_name: "tcga_files_dev"
+      cluster_node_type: "i3.large"
+      max_workers: 32
+
+  # Staging environment
+  staging:
+    mode: production
+    workspace:
+      root_path: /Shared/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog_name: "staging_catalog"
+      schema_name: "tcga_staging"
+      volume_name: "tcga_files_staging"
+      cluster_node_type: "i3.xlarge"
+      max_workers: 48
+
+  # Production environment
+  prod:
+    mode: production
+    workspace:
+      root_path: /Shared/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog_name: "prod_catalog"
+      schema_name: "tcga"
+      volume_name: "tcga_files"
+      cluster_node_type: "i3.2xlarge"
+      max_workers: 64
+    # Production requires explicit permissions
+    permissions:
+      - level: CAN_MANAGE
+        group_name: "data-engineering"
+      - level: CAN_VIEW
+        group_name: "data-analysts"
+
+# Run configuration
+run_as:
+  # Use a service principal in production
+  # user_name: "${DATABRICKS_USER_NAME}"
+  service_principal_name: "${DATABRICKS_SERVICE_PRINCIPAL}"

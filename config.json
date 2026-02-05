@@ -1,6 +1,6 @@
 {
   "lakehouse": {
-    "catalog": "db_omics_solacc",
+    "catalog": "<CHANGE TO YOUR CATALOG NAME>",
     "schema": "tcga",
     "volume": "tcga_files"
   },

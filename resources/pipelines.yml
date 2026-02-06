@@ -16,17 +16,19 @@ resources:
         - file:
             path: ../etl_pipelines/transformations/transform.py
 
-      # Cluster configuration
+      # Cluster configuration (memory-optimized for ETL)
       clusters:
         - label: "default"
           autoscale:
-            min_workers: 1
-            max_workers: 4
+            min_workers: 2
+            max_workers: 8
             mode: ENHANCED
-          node_type_id: "${var.cluster_node_type}"
+          node_type_id: "${var.etl_node_type}"  # r5.2xlarge: 8 vCPUs, 64 GB RAM
           spark_conf:
             spark.databricks.delta.optimizeWrite.enabled: "true"
             spark.databricks.delta.autoCompact.enabled: "true"
+            spark.sql.adaptive.enabled: "true"
+            spark.sql.adaptive.coalescePartitions.enabled: "true"
 
       # Pipeline configuration
       configuration:

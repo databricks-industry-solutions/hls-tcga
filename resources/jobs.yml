@@ -1,4 +1,5 @@
 # Job definitions for TCGA project
+# Optimized for AWS with specific compute resources per workload
 
 resources:
   jobs:
@@ -6,46 +7,70 @@ resources:
     tcga_data_workflow:
       name: "[${bundle.target}] TCGA Data Workflow"
 
-      # Job clusters
+      # Job clusters optimized for specific workloads
       job_clusters:
-        - job_cluster_key: "data_download_cluster"
+        # Single node cluster for data download (64 cores for concurrency)
+        - job_cluster_key: "download_cluster"
           new_cluster:
-            num_workers: 4
-            node_type_id: "${var.cluster_node_type}"
+            num_workers: 0  # Single node (driver-only)
+            node_type_id: "${var.download_node_type}"  # r5d.16xlarge: 64 vCPUs, 512 GB RAM
             spark_version: "14.3.x-scala2.12"
             spark_conf:
+              spark.databricks.cluster.profile: "singleNode"
+              spark.master: "local[*]"
               spark.databricks.delta.preview.enabled: "true"
+              spark.sql.adaptive.enabled: "true"
+            custom_tags:
+              ResourceClass: "SingleNode"
             data_security_mode: "USER_ISOLATION"
 
-        - job_cluster_key: "analysis_cluster"
+        # Memory-optimized cluster for ETL processing
+        - job_cluster_key: "etl_cluster"
           new_cluster:
             autoscale:
               min_workers: 2
               max_workers: 8
-            node_type_id: "${var.cluster_node_type}"
+            node_type_id: "${var.etl_node_type}"  # r5.2xlarge: 8 vCPUs, 64 GB RAM per node
+            spark_version: "14.3.x-scala2.12"
+            spark_conf:
+              spark.databricks.delta.preview.enabled: "true"
+              spark.databricks.delta.optimizeWrite.enabled: "true"
+              spark.databricks.delta.autoCompact.enabled: "true"
+              spark.sql.adaptive.enabled: "true"
+              spark.sql.adaptive.coalescePartitions.enabled: "true"
+            data_security_mode: "USER_ISOLATION"
+
+        # Analysis cluster for ML workloads
+        - job_cluster_key: "analysis_cluster"
+          new_cluster:
+            autoscale:
+              min_workers: 2
+              max_workers: 6
+            node_type_id: "${var.analysis_node_type}"  # r5d.xlarge: 4 vCPUs, 32 GB RAM
             spark_version: "14.3.x-cpu-ml-scala2.12"
             spark_conf:
               spark.databricks.delta.preview.enabled: "true"
+              spark.sql.adaptive.enabled: "true"
             data_security_mode: "USER_ISOLATION"
 
       # Job tasks
       tasks:
         # Task 1: Setup Unity Catalog resources
         - task_key: "setup"
-          job_cluster_key: "data_download_cluster"
+          job_cluster_key: "download_cluster"
           notebook_task:
             notebook_path: ../00-setup.ipynb
             base_parameters:
-              catalog: "${var.catalog_name}"
-              schema: "${var.schema_name}"
-              volume: "${var.volume_name}"
+              catalog_name: "${var.catalog_name}"
+              schema_name: "${var.schema_name}"
+              volume_name: "${var.volume_name}"
           timeout_seconds: 600
 
-        # Task 2: Download data from GDC
+        # Task 2: Download data from GDC (uses single node with 64 cores)
         - task_key: "download_data"
           depends_on:
             - task_key: "setup"
-          job_cluster_key: "data_download_cluster"
+          job_cluster_key: "download_cluster"
           notebook_task:
             notebook_path: ../01-data-download.py
             base_parameters:
@@ -56,7 +81,7 @@ resources:
           max_retries: 2
           retry_on_timeout: true
 
-        # Task 3: Run DLT pipeline
+        # Task 3: Run DLT pipeline (uses its own cluster config from pipelines.yml)
         - task_key: "run_dlt_pipeline"
           depends_on:
             - task_key: "download_data"
@@ -70,24 +95,18 @@ resources:
             - task_key: "run_dlt_pipeline"
           job_cluster_key: "analysis_cluster"
           notebook_task:
-            notebook_path: ../02-tcga-expression-clustering.py
+            notebook_path: ../02-tcga-expression-clustering-optimized.py
+            base_parameters:
+              n_top_genes: "1000"
+              n_pca_components: "50"
+              use_sample: "false"
           timeout_seconds: 7200  # 2 hours
 
-      # Schedule (daily at 2 AM)
+      # Schedule (daily at 2 AM) - starts paused
       schedule:
         quartz_cron_expression: "0 0 2 * * ?"
         timezone_id: "America/Los_Angeles"
-        pause_status: "PAUSED"  # Start paused, enable manually
-
-      # Email notifications (uncomment and add your email)
-      # email_notifications:
-      #   on_start:
-      #     - "your-email@company.com"
-      #   on_success:
-      #     - "your-email@company.com"
-      #   on_failure:
-      #     - "your-email@company.com"
-      #   no_alert_for_skipped_runs: true
+        pause_status: "PAUSED"
 
       # Timeout for entire job
       timeout_seconds: 28800  # 8 hours
@@ -98,31 +117,28 @@ resources:
       # Format
       format: MULTI_TASK
 
-      # Permissions (uncomment if groups exist)
-      # permissions:
-      #   - level: CAN_MANAGE
-      #     group_name: "data-engineering"
-      #   - level: CAN_VIEW
-      #     group_name: "data-analysts"
-
     # Incremental data refresh job (for periodic updates)
     tcga_incremental_refresh:
       name: "[${bundle.target}] TCGA Incremental Refresh"
 
       job_clusters:
-        - job_cluster_key: "refresh_cluster"
+        # Single node for incremental download
+        - job_cluster_key: "refresh_download_cluster"
           new_cluster:
-            autoscale:
-              min_workers: 2
-              max_workers: 6
-            node_type_id: "${var.cluster_node_type}"
+            num_workers: 0  # Single node
+            node_type_id: "${var.download_node_type}"
             spark_version: "14.3.x-scala2.12"
+            spark_conf:
+              spark.databricks.cluster.profile: "singleNode"
+              spark.master: "local[*]"
+            custom_tags:
+              ResourceClass: "SingleNode"
             data_security_mode: "USER_ISOLATION"
 
       tasks:
         # Download only new data
         - task_key: "download_new_data"
-          job_cluster_key: "refresh_cluster"
+          job_cluster_key: "refresh_download_cluster"
           notebook_task:
             notebook_path: ../01-data-download.py
             base_parameters:
@@ -145,15 +161,6 @@ resources:
         timezone_id: "America/Los_Angeles"
         pause_status: "PAUSED"
 
-      # email_notifications:
-      #   on_failure:
-      #     - "your-email@company.com"
-      #   no_alert_for_skipped_runs: true
-
       timeout_seconds: 7200  # 2 hours
       max_concurrent_runs: 1
       format: MULTI_TASK
-
-      # permissions:
-      #   - level: CAN_MANAGE
-      #     group_name: "data-engineering"

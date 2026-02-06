@@ -1,6 +1,7 @@
+##TODO this is the main config, and there are other config files in under config folder, this is redundant
 {
   "lakehouse": {
-    "catalog": "<CHANGE TO YOUR CATALOG NAME>",
+    "catalog": "kermany",
     "schema": "tcga",
     "volume": "tcga_files"
   },

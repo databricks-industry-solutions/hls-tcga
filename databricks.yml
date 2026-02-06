@@ -23,7 +23,7 @@ variables:
 
   cluster_node_type:
     description: Node type for compute clusters
-    default: "Standard_DS3_v2"
+    default: "r5d.xlarge"
 
   max_workers:
     description: Maximum number of workers for data download
@@ -60,7 +60,7 @@ targets:
       catalog_name: "dev_catalog"
       schema_name: "tcga_dev"
       volume_name: "tcga_files_dev"
-      cluster_node_type: "Standard_DS3_v2"
+      cluster_node_type: "r5d.xlarge"
       max_workers: 32
       pipeline_development_mode: true
 
@@ -73,7 +73,7 @@ targets:
       catalog_name: "staging_catalog"
       schema_name: "tcga_staging"
       volume_name: "tcga_files_staging"
-      cluster_node_type: "Standard_DS4_v2"
+      cluster_node_type: "r5d.xlarge"
       max_workers: 48
 
   # Production environment
@@ -85,7 +85,7 @@ targets:
       catalog_name: "prod_catalog"
       schema_name: "tcga"
       volume_name: "tcga_files"
-      cluster_node_type: "Standard_DS5_v2"
+      cluster_node_type: "r5d.xlarge"
       max_workers: 64
     # Production requires explicit permissions (uncomment if groups exist)
     # permissions:

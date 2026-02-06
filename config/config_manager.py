@@ -28,7 +28,7 @@ class LakehouseConfig:
     def database_name(self) -> str:
         """Get the full database name"""
         return f'{self.catalog}.{self.schema}'
-
+##TODO: Catalog name is hardcoded here, should read the catalog name from main configuration
     def validate(self) -> None:
         """Validate lakehouse configuration"""
         if not self.catalog or self.catalog == "<CHANGE TO YOUR CATALOG NAME>":

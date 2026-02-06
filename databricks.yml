@@ -31,7 +31,7 @@ variables:
 
   etl_node_type:
     description: Node type for ETL cluster (memory optimized)
-    default: "r5.2xlarge"  # 8 vCPUs, 64 GB RAM
+    default: "r5d.2xlarge"  # 8 vCPUs, 64 GB RAM, local NVMe SSD
 
   analysis_node_type:
     description: Node type for analysis cluster
@@ -67,6 +67,7 @@ targets:
     default: true
     workspace:
       root_path: ~/.bundle/${bundle.name}/${bundle.target}
+      profile: HLS
     variables:
       # These defaults work for most setups
       # Override via --var flag if needed: databricks bundle deploy --var="catalog_name=my_catalog"

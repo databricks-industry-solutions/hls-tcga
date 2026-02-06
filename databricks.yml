@@ -23,27 +23,30 @@ variables:
 
   cluster_node_type:
     description: Node type for compute clusters
-    default: "i3.xlarge"
+    default: "Standard_DS3_v2"
 
   max_workers:
     description: Maximum number of workers for data download
     default: 64
 
+  pipeline_development_mode:
+    description: Enable DLT development mode
+    default: false
+
 # Workspace configuration
-workspace:
-  host: "${DATABRICKS_HOST}"
+# Host is automatically determined from your Databricks CLI profile
+workspace: {}
 
 # Artifacts to sync to workspace
 artifacts:
   notebooks:
     path: .
     files:
-      - source: "00-setup.ipynb"
-      - source: "01-data-download.py"
-      - source: "02-tcga-expression-clustering.py"
-      - source: "config.json"
-      - source: "config/*.py"
-      - source: "etl_pipelines/**/*.py"
+      - source: "./*.ipynb"
+      - source: "./*.py"
+      - source: "./config.json"
+      - source: "./config/*.py"
+      - source: "./etl_pipelines/**/*.py"
 
 # Targets for different environments
 targets:
@@ -57,8 +60,9 @@ targets:
       catalog_name: "dev_catalog"
       schema_name: "tcga_dev"
       volume_name: "tcga_files_dev"
-      cluster_node_type: "i3.large"
+      cluster_node_type: "Standard_DS3_v2"
       max_workers: 32
+      pipeline_development_mode: true
 
   # Staging environment
   staging:
@@ -69,7 +73,7 @@ targets:
       catalog_name: "staging_catalog"
       schema_name: "tcga_staging"
       volume_name: "tcga_files_staging"
-      cluster_node_type: "i3.xlarge"
+      cluster_node_type: "Standard_DS4_v2"
       max_workers: 48
 
   # Production environment
@@ -81,17 +85,16 @@ targets:
       catalog_name: "prod_catalog"
       schema_name: "tcga"
       volume_name: "tcga_files"
-      cluster_node_type: "i3.2xlarge"
+      cluster_node_type: "Standard_DS5_v2"
       max_workers: 64
-    # Production requires explicit permissions
-    permissions:
-      - level: CAN_MANAGE
-        group_name: "data-engineering"
-      - level: CAN_VIEW
-        group_name: "data-analysts"
+    # Production requires explicit permissions (uncomment if groups exist)
+    # permissions:
+    #   - level: CAN_MANAGE
+    #     group_name: "data-engineering"
+    #   - level: CAN_VIEW
+    #     - group_name: "data-analysts"
 
-# Run configuration
-run_as:
+# Run configuration (optional - uncomment for production with service principal)
+# run_as:
   # Use a service principal in production
-  # user_name: "${DATABRICKS_USER_NAME}"
-  service_principal_name: "${DATABRICKS_SERVICE_PRINCIPAL}"
+  # service_principal_name: "your-service-principal-name"

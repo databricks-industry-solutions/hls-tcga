@@ -9,12 +9,12 @@ resources:
       # Target schema for tables
       target: "${var.catalog_name}.${var.schema_name}"
 
-      # Libraries (DLT notebooks)
+      # Libraries (DLT Python files)
       libraries:
-        - notebook:
-            path: ./etl_pipelines/transformations/data_ingestion.py
-        - notebook:
-            path: ./etl_pipelines/transformations/transform.py
+        - file:
+            path: ../etl_pipelines/transformations/data_ingestion.py
+        - file:
+            path: ../etl_pipelines/transformations/transform.py
 
       # Cluster configuration
       clusters:
@@ -35,8 +35,8 @@ resources:
         volume: "${var.volume_name}"
         pipelines.applyChangesPreviewEnabled: "true"
 
-      # Development mode settings
-      development: ${{ targets.dev.mode == 'development' }}
+      # Development mode settings (controlled by target variable)
+      development: ${var.pipeline_development_mode}
 
       # Continuous execution (disabled by default, enable for streaming)
       continuous: false
@@ -53,17 +53,17 @@ resources:
       # Storage location for pipeline metadata and checkpoints
       storage: "/mnt/dlt/${bundle.target}/tcga_pipeline"
 
-      # Notifications (optional)
-      notifications:
-        - alerts:
-            - "on-update-failure"
-            - "on-update-fatal-failure"
-          email_recipients:
-            - "${DATABRICKS_USER_EMAIL}"
+      # Notifications (optional - uncomment and add your email)
+      # notifications:
+      #   - alerts:
+      #       - "on-update-failure"
+      #       - "on-update-fatal-failure"
+      #     email_recipients:
+      #       - "your-email@company.com"
 
-      # Permissions
-      permissions:
-        - level: CAN_MANAGE
-          group_name: "data-engineering"
-        - level: CAN_VIEW
-          group_name: "data-analysts"
+      # Permissions (uncomment if groups exist)
+      # permissions:
+      #   - level: CAN_MANAGE
+      #     group_name: "data-engineering"
+      #   - level: CAN_VIEW
+      #     group_name: "data-analysts"

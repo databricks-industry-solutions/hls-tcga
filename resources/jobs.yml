@@ -34,7 +34,7 @@ resources:
         - task_key: "setup"
           job_cluster_key: "data_download_cluster"
           notebook_task:
-            notebook_path: ./00-setup.ipynb
+            notebook_path: ../00-setup.ipynb
             base_parameters:
               catalog: "${var.catalog_name}"
               schema: "${var.schema_name}"
@@ -47,7 +47,7 @@ resources:
             - task_key: "setup"
           job_cluster_key: "data_download_cluster"
           notebook_task:
-            notebook_path: ./01-data-download.py
+            notebook_path: ../01-data-download.py
             base_parameters:
               force_download: "false"
               max_workers: "${var.max_workers}"
@@ -70,7 +70,7 @@ resources:
             - task_key: "run_dlt_pipeline"
           job_cluster_key: "analysis_cluster"
           notebook_task:
-            notebook_path: ./02-tcga-expression-clustering.py
+            notebook_path: ../02-tcga-expression-clustering.py
           timeout_seconds: 7200  # 2 hours
 
       # Schedule (daily at 2 AM)
@@ -79,15 +79,15 @@ resources:
         timezone_id: "America/Los_Angeles"
         pause_status: "PAUSED"  # Start paused, enable manually
 
-      # Email notifications
-      email_notifications:
-        on_start:
-          - "${DATABRICKS_USER_EMAIL}"
-        on_success:
-          - "${DATABRICKS_USER_EMAIL}"
-        on_failure:
-          - "${DATABRICKS_USER_EMAIL}"
-        no_alert_for_skipped_runs: true
+      # Email notifications (uncomment and add your email)
+      # email_notifications:
+      #   on_start:
+      #     - "your-email@company.com"
+      #   on_success:
+      #     - "your-email@company.com"
+      #   on_failure:
+      #     - "your-email@company.com"
+      #   no_alert_for_skipped_runs: true
 
       # Timeout for entire job
       timeout_seconds: 28800  # 8 hours
@@ -98,12 +98,12 @@ resources:
       # Format
       format: MULTI_TASK
 
-      # Permissions
-      permissions:
-        - level: CAN_MANAGE
-          group_name: "data-engineering"
-        - level: CAN_VIEW
-          group_name: "data-analysts"
+      # Permissions (uncomment if groups exist)
+      # permissions:
+      #   - level: CAN_MANAGE
+      #     group_name: "data-engineering"
+      #   - level: CAN_VIEW
+      #     group_name: "data-analysts"
 
     # Incremental data refresh job (for periodic updates)
     tcga_incremental_refresh:
@@ -124,7 +124,7 @@ resources:
         - task_key: "download_new_data"
           job_cluster_key: "refresh_cluster"
           notebook_task:
-            notebook_path: ./01-data-download.py
+            notebook_path: ../01-data-download.py
             base_parameters:
               force_download: "false"
               max_workers: "32"
@@ -145,15 +145,15 @@ resources:
         timezone_id: "America/Los_Angeles"
         pause_status: "PAUSED"
 
-      email_notifications:
-        on_failure:
-          - "${DATABRICKS_USER_EMAIL}"
-        no_alert_for_skipped_runs: true
+      # email_notifications:
+      #   on_failure:
+      #     - "your-email@company.com"
+      #   no_alert_for_skipped_runs: true
 
       timeout_seconds: 7200  # 2 hours
       max_concurrent_runs: 1
       format: MULTI_TASK
 
-      permissions:
-        - level: CAN_MANAGE
-          group_name: "data-engineering"
+      # permissions:
+      #   - level: CAN_MANAGE
+      #     group_name: "data-engineering"

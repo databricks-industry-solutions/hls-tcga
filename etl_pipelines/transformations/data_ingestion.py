@@ -13,19 +13,19 @@ Tables created:
 import dlt
 from pyspark.sql.types import *
 from pyspark.sql.functions import col, current_timestamp, count, when, isnan
-import os
-import json
 
-# Load configuration
-config_path = os.path.abspath('../../config.json')
-with open(config_path, 'r') as file:
-    config = json.load(file)
-
-# Configuration variables
-CATALOG = config['lakehouse']['catalog']
-SCHEMA = config['lakehouse']['schema']
-VOLUME = config['lakehouse']['volume']
+# Load configuration from DLT pipeline settings
+# These are set in pipelines.yml configuration section
+CATALOG = spark.conf.get("catalog")
+SCHEMA = spark.conf.get("schema")
+VOLUME = spark.conf.get("volume")
 VOLUME_PATH = f'/Volumes/{CATALOG}/{SCHEMA}/{VOLUME}'
+
+print(f"DLT Pipeline Configuration:")
+print(f"  Catalog: {CATALOG}")
+print(f"  Schema: {SCHEMA}")
+print(f"  Volume: {VOLUME}")
+print(f"  Volume Path: {VOLUME_PATH}")
 
 # Data quality thresholds
 MIN_FILE_SIZE = 1000  # bytes

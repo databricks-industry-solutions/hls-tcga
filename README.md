@@ -35,14 +35,41 @@ Within this solution accelerator, we present a production-ready template for loa
 
 ### Quick Start
 
-#### Option 1: Databricks Asset Bundle (Recommended)
+#### Option 1: One-Command Deployment (Recommended)
+
+The easiest way to deploy the complete pipeline:
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd hls-tcga
+
+# Run the deployment script (interactive)
+python deploy.py
+
+# Or deploy and run immediately
+python deploy.py --run
+```
+
+The `deploy.py` script will:
+- Auto-detect your Databricks workspace and cloud provider (AWS/Azure)
+- Prompt for configuration parameters with intelligent defaults
+- Create Unity Catalog resources (catalog, schema, volume)
+- Deploy the complete pipeline to your workspace
+- Optionally run the workflow immediately
+
+📖 See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment options and configuration.
+
+#### Option 2: Manual Databricks Asset Bundle
+
+If you prefer direct Databricks CLI usage:
 
 ```bash
 # Configure Databricks CLI
 databricks configure --token
 
-# Set environment variables
-export DATABRICKS_USER_EMAIL=your-email@company.com
+# Create config.json with your settings
+python deploy.py --config-only
 
 # Deploy to development
 databricks bundle deploy --target dev
@@ -51,13 +78,12 @@ databricks bundle deploy --target dev
 databricks bundle run tcga_data_workflow --target dev
 ```
 
-#### Option 2: Manual Execution
+#### Option 3: Manual Notebook Execution
 
-1. **Configure**: Update [config.json](./config.json) with your catalog name
-2. **Setup**: Run [00-setup.ipynb](./00-setup.ipynb) to create Unity Catalog resources
-3. **Download**: Run [01-data-download.py](./01-data-download.py) to fetch data from GDC APIs
-4. **Transform**: Deploy [DLT pipelines](./etl_pipelines) to create managed tables
-5. **Analyze**: Run [02-tcga-expression-clustering-optimized.py](./02-tcga-expression-clustering-optimized.py) for analysis
+1. **Configure**: Run [00-setup.ipynb](./00-setup.ipynb) to create Unity Catalog resources and config.json
+2. **Download**: Run [01-data-download.py](./01-data-download.py) to fetch data from GDC APIs
+3. **Transform**: Deploy [DLT pipelines](./etl_pipelines) to create managed tables
+4. **Analyze**: Run [02-tcga-expression-clustering-optimized.py](./02-tcga-expression-clustering-optimized.py) for analysis
 
 ### Workflow Components
 

@@ -1,4 +1,3 @@
-##TODO this is the main config, and there are other config files in under config folder, this is redundant
 {
   "lakehouse": {
     "catalog": "kermany",
@@ -12,9 +11,18 @@
   },
   "pipeline": {
     "max_workers": 64,
-    "max_records": 20000,
+    "max_records": 2000,
     "force_download": false,
     "retry_attempts": 3,
     "timeout_seconds": 300
+  },
+  "compute": {
+    "download_node_type": "r5d.16xlarge",
+    "etl_node_type": "r5d.2xlarge",
+    "analysis_node_type": "r5d.xlarge"
+  },
+  "deployment": {
+    "profile": "HLS",
+    "cloud": "aws"
   }
 }

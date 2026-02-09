@@ -41,17 +41,12 @@ from datetime import datetime
 # PySpark imports
 from pyspark.sql.functions import (
     col, variance, mean, expr, count,
-    collect_list, first, current_timestamp
+    collect_list, first, current_timestamp, lit
 )
 from pyspark.sql import Window
 
-# Add project root to path
-project_root = os.path.abspath('.')
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-# Import configuration manager
-from config.config_manager import load_config
+# Import configuration utilities
+from utils.config_loader import ConfigLoader
 
 # Import MLflow for experiment tracking
 import mlflow
@@ -63,13 +58,43 @@ print("✓ All libraries imported successfully")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Load Configuration and Setup Widgets
+# MAGIC ## 2. Load Configuration from Delta Table
 
 # COMMAND ----------
 
-# Load configuration
-environment = os.getenv('TCGA_ENVIRONMENT', 'production')
-config = load_config(environment=environment)
+# Create widgets for catalog and schema (passed from job)
+dbutils.widgets.text("catalog", "kermany", "Catalog")
+dbutils.widgets.text("schema", "tcga", "Schema")
+
+catalog = dbutils.widgets.get("catalog")
+schema = dbutils.widgets.get("schema")
+
+if not catalog or not schema:
+    raise ValueError("catalog and schema parameters must be provided")
+
+print(f"Loading configuration from {catalog}.{schema}.pipeline_config...")
+
+# Load configuration from Delta table
+config_loader = ConfigLoader(spark, catalog, schema)
+config = config_loader.get_active_config()
+
+print(f"✓ Loaded configuration ID: {config['config_id']}")
+print(f"✓ Timestamp: {config['config_timestamp']}")
+
+# Extract configuration values
+config_id = config['config_id']
+volume_path = config['volume_path']
+database_name = config['database_name']
+
+print(f"Volume path: {volume_path}")
+print(f"Database: {database_name}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 3. Setup Analysis Parameters
+
+# COMMAND ----------
 
 # Create widgets for notebook parameters
 dbutils.widgets.text("n_top_genes", "1000", "Number of Top Variable Genes")
@@ -91,12 +116,12 @@ N_CLUSTERS = int(dbutils.widgets.get("n_clusters"))
 USE_SAMPLE = dbutils.widgets.get("use_sample").lower() == "true"
 SAMPLE_SIZE = int(dbutils.widgets.get("sample_size"))
 
-# Extract configuration
-catalog = config.lakehouse.catalog
-schema = config.lakehouse.schema
-volume = config.lakehouse.volume
-volume_path = config.lakehouse.volume_path
-database_name = config.lakehouse.database_name
+print(f"Analysis Parameters:")
+print(f"  Top Genes: {N_TOP_GENES}")
+print(f"  PCA Components: {N_PCA_COMPONENTS}")
+print(f"  t-SNE Components: {N_TSNE_COMPONENTS}")
+print(f"  Clusters: {N_CLUSTERS}")
+print(f"  Use Sample: {USE_SAMPLE}")
 
 # Get user ID for table naming
 user_id = spark.sql('SELECT session_user() AS user').select(
@@ -471,13 +496,18 @@ results_pdf = pd.DataFrame({
     'tsne_2': X_tsne[:, 1] if N_TSNE_COMPONENTS > 1 else 0
 })
 
-# Convert to Spark DataFrame and save
+# Convert to Spark DataFrame and add config_id for traceability
 results_df = spark.createDataFrame(results_pdf)
+results_df = results_df.withColumn("config_id", lit(config_id))
+results_df = results_df.withColumn("analysis_timestamp", current_timestamp())
+
 results_table = f"{database_name}.{user_id}_expression_dimensionality_results"
 results_df.write.mode('overwrite').saveAsTable(results_table)
 
 print(f"✓ Results saved to: {results_table}")
+print(f"✓ Results linked to configuration ID: {config_id}")
 mlflow.log_param("results_table", results_table)
+mlflow.log_param("config_id", config_id)
 
 # COMMAND ----------
 
@@ -549,13 +579,18 @@ print(f"  Inertia: {kmeans.inertia_:.2f}")
 
 # COMMAND ----------
 
-# Convert back to Spark and save
+# Convert back to Spark, add config_id, and save
 final_results_df = spark.createDataFrame(results_top_tissues)
+final_results_df = final_results_df.withColumn("config_id", lit(config_id))
+final_results_df = final_results_df.withColumn("analysis_timestamp", current_timestamp())
+
 final_table = f"{database_name}.{user_id}_expression_clustering_final"
 final_results_df.write.mode('overwrite').saveAsTable(final_table)
 
 print(f"✓ Final results saved to: {final_table}")
+print(f"✓ Results linked to configuration ID: {config_id}")
 mlflow.log_param("final_results_table", final_table)
+mlflow.log_param("config_id", config_id)
 
 # Display sample
 display(final_results_df.limit(10))

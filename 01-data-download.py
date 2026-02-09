@@ -30,7 +30,8 @@ from urllib3.util.retry import Retry
 
 # COMMAND ----------
 
-# MAGIC %run ./00-setup
+# Import configuration utilities
+from utils.config_loader import ConfigLoader
 
 # COMMAND ----------
 
@@ -43,16 +44,47 @@ logger = logging.getLogger(__name__)
 
 # COMMAND ----------
 
-# Configure widgets for parameterization
-dbutils.widgets.text("force_download", "false", "Force Download")
-dbutils.widgets.text("max_workers", "64", "Max Concurrent Workers")
-dbutils.widgets.text("max_records", "20000", "Max Records to Download")
+# MAGIC %md
+# MAGIC ## Load Configuration from Delta Table
 
-FORCE_DOWNLOAD = dbutils.widgets.get("force_download").lower() == "true"
-MAX_WORKERS = int(dbutils.widgets.get("max_workers"))
-MAX_RECORDS = int(dbutils.widgets.get("max_records"))
+# COMMAND ----------
 
-logger.info(f"Configuration: FORCE_DOWNLOAD={FORCE_DOWNLOAD}, MAX_WORKERS={MAX_WORKERS}, MAX_RECORDS={MAX_RECORDS}")
+# Create widgets for catalog and schema (passed from job)
+dbutils.widgets.text("catalog", "kermany", "Catalog")
+dbutils.widgets.text("schema", "tcga", "Schema")
+
+catalog = dbutils.widgets.get("catalog")
+schema = dbutils.widgets.get("schema")
+
+if not catalog or not schema:
+    raise ValueError("catalog and schema parameters must be provided")
+
+logger.info(f"Loading configuration from {catalog}.{schema}.pipeline_config...")
+
+# Load configuration from Delta table
+config_loader = ConfigLoader(spark, catalog, schema)
+config = config_loader.get_active_config()
+
+logger.info(f"✓ Loaded configuration ID: {config['config_id']}")
+logger.info(f"✓ Timestamp: {config['config_timestamp']}")
+
+# Extract configuration values
+volume_path = config['volume_path']
+database_name = config['database_name']
+cases_endpt = config['cases_endpt']
+files_endpt = config['files_endpt']
+data_endpt = config['data_endpt']
+
+# Pipeline parameters (can be overridden by job parameters)
+MAX_WORKERS = config['max_workers']
+MAX_RECORDS = config['max_records']
+FORCE_DOWNLOAD = config['force_download']
+RETRY_ATTEMPTS = config['retry_attempts']
+TIMEOUT_SECONDS = config['timeout_seconds']
+
+logger.info(f"Configuration: MAX_WORKERS={MAX_WORKERS}, MAX_RECORDS={MAX_RECORDS}, FORCE_DOWNLOAD={FORCE_DOWNLOAD}")
+logger.info(f"Volume path: {volume_path}")
+logger.info(f"Database: {database_name}")
 
 # COMMAND ----------
 

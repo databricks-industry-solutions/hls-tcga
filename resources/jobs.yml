@@ -55,28 +55,26 @@ resources:
 
       # Job tasks
       tasks:
-        # Task 1: Setup Unity Catalog resources
-        - task_key: "setup"
+        # Task 1: Load Configuration to Delta Table
+        # This task loads config.json into a Delta table with unique ID and timestamp
+        # All subsequent tasks read configuration from this table
+        - task_key: "load_config"
           job_cluster_key: "download_cluster"
           notebook_task:
-            notebook_path: ../00-setup.ipynb
-            base_parameters:
-              catalog_name: "${var.catalog_name}"
-              schema_name: "${var.schema_name}"
-              volume_name: "${var.volume_name}"
-          timeout_seconds: 600
+            notebook_path: ../00-load-config.py
+          timeout_seconds: 300
 
         # Task 2: Download data from GDC (uses single node with 64 cores)
+        # Reads configuration from Delta table
         - task_key: "download_data"
           depends_on:
-            - task_key: "setup"
+            - task_key: "load_config"
           job_cluster_key: "download_cluster"
           notebook_task:
             notebook_path: ../01-data-download.py
             base_parameters:
-              force_download: "false"
-              max_workers: "${var.max_workers}"
-              max_records: "20000"
+              catalog: "${var.catalog_name}"
+              schema: "${var.schema_name}"
           timeout_seconds: 14400  # 4 hours
           max_retries: 2
           retry_on_timeout: true

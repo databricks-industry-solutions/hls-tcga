@@ -26,7 +26,7 @@ variables:
 
   user_name:
     description: Databricks username (for run_as permissions)
-    default: "user@company.com"
+    default: "amir.kermany@databricks.com"
 
   # Compute configuration for AWS
   download_node_type:

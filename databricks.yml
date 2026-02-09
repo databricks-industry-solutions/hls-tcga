@@ -24,6 +24,10 @@ variables:
     description: Volume name for raw data storage
     default: "tcga_files"
 
+  user_name:
+    description: Databricks username (for run_as permissions)
+    default: "user@company.com"
+
   # Compute configuration for AWS
   download_node_type:
     description: Single node type for data download (64 cores for concurrency)

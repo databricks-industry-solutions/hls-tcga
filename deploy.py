@@ -159,6 +159,30 @@ def detect_cloud_provider(profile: str) -> str:
         return 'aws'  # Default to AWS
 
 
+def get_current_username(profile: str) -> Optional[str]:
+    """Get current Databricks username from workspace"""
+    try:
+        result = subprocess.run(
+            ['databricks', 'current-user', 'me', '--profile', profile, '--output', 'json'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        import json
+        user_info = json.loads(result.stdout)
+        # Try to get username from different possible fields
+        username = user_info.get('userName')
+        if not username:
+            # Try emails field
+            emails = user_info.get('emails', [])
+            if emails and len(emails) > 0:
+                username = emails[0].get('value')
+        return username
+    except Exception as e:
+        print_warning(f"Could not detect username: {e}")
+        return None
+
+
 def get_default_instance_types(cloud: str) -> Dict[str, str]:
     """Get default instance types based on cloud provider"""
     if cloud == 'azure':
@@ -467,11 +491,26 @@ def deploy_bundle(config: Dict[str, Any], repo_root: Path) -> bool:
     try:
         print_header("Deploying Pipeline")
 
+        # Get username for run_as configuration
+        profile = config['deployment']['profile']
+        username = get_current_username(profile)
+
+        if not username:
+            print_error("Could not determine Databricks username")
+            print_info("The DLT pipeline needs to run as a specific user for volume permissions")
+            username = input("Please enter your Databricks username (e.g., user@company.com): ").strip()
+            if not username:
+                print_error("Username is required for deployment")
+                return False
+
+        print_success(f"DLT pipeline will run as: {username}")
+
         # Build var flags for deployment
         var_flags = [
             '--var', f'catalog_name={config["lakehouse"]["catalog"]}',
             '--var', f'schema_name={config["lakehouse"]["schema"]}',
             '--var', f'volume_name={config["lakehouse"]["volume"]}',
+            '--var', f'user_name={username}',
             '--var', f'max_workers={config["pipeline"]["max_workers"]}',
             '--var', f'download_node_type={config["compute"]["download_node_type"]}',
             '--var', f'etl_node_type={config["compute"]["etl_node_type"]}',

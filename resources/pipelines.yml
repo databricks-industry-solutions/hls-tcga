@@ -6,6 +6,10 @@ resources:
     tcga_etl_pipeline:
       name: "[${bundle.target}] TCGA ETL Pipeline"
 
+      # Run as the deploying user to inherit their permissions
+      run_as:
+        user_name: "${var.user_name}"
+
       # Target schema for tables
       target: "${var.catalog_name}.${var.schema_name}"
 

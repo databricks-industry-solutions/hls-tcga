@@ -61,7 +61,7 @@ resources:
         - task_key: "load_config"
           job_cluster_key: "download_cluster"
           notebook_task:
-            notebook_path: ../00-load-config
+            notebook_path: ../00-load-config.py
           timeout_seconds: 900  # 15 minutes (includes cluster startup time)
 
         # Task 2: Download data from GDC (uses single node with 64 cores)
@@ -71,7 +71,7 @@ resources:
             - task_key: "load_config"
           job_cluster_key: "download_cluster"
           notebook_task:
-            notebook_path: ../01-data-download
+            notebook_path: ../01-data-download.py
             base_parameters:
               catalog: "${var.catalog_name}"
               schema: "${var.schema_name}"
@@ -93,7 +93,7 @@ resources:
             - task_key: "run_dlt_pipeline"
           job_cluster_key: "analysis_cluster"
           notebook_task:
-            notebook_path: ../02-tcga-expression-clustering-optimized
+            notebook_path: ../02-tcga-expression-clustering-optimized.py
             base_parameters:
               n_top_genes: "1000"
               n_pca_components: "50"
@@ -138,7 +138,7 @@ resources:
         - task_key: "download_new_data"
           job_cluster_key: "refresh_download_cluster"
           notebook_task:
-            notebook_path: ../01-data-download
+            notebook_path: ../01-data-download.py
             base_parameters:
               force_download: "false"
               max_workers: "32"

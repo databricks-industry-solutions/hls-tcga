@@ -33,8 +33,6 @@ resources:
             spark.databricks.delta.autoCompact.enabled: "true"
             spark.sql.adaptive.enabled: "true"
             spark.sql.adaptive.coalescePartitions.enabled: "true"
-          # Enable Unity Catalog access
-          data_security_mode: USER_ISOLATION
 
       # Pipeline configuration
       configuration:

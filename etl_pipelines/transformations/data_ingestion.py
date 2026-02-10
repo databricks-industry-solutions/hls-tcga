@@ -39,16 +39,6 @@ print(f"  Schema: {SCHEMA}")
 print(f"  Volume: {VOLUME}")
 print(f"  Volume Path: {VOLUME_PATH}")
 
-# Verify the volume path is accessible (this will fail early if there's an issue)
-try:
-    # Try to list the volume to ensure it's accessible
-    dbutils.fs.ls(VOLUME_PATH)
-    print(f"✓ Volume path is accessible")
-except Exception as e:
-    print(f"✗ Cannot access volume path: {e}")
-    print(f"  This suggests a permission or configuration issue")
-    raise
-
 # Data quality thresholds
 MIN_FILE_SIZE = 1000  # bytes
 MIN_GENE_FPKM = 0.0

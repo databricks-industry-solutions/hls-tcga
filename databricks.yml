@@ -14,7 +14,7 @@ include:
 variables:
   catalog_name:
     description: Unity Catalog name
-    default: "main"
+    default: "kermany"
 
   schema_name:
     description: Schema name within the catalog
@@ -60,7 +60,11 @@ artifacts:
     path: .
     files:
       - source: "./*.ipynb"
-      - source: "./*.py"
+      - source: "./00-load-config.py"
+      - source: "./01-data-download.py"
+      - source: "./02-tcga-expression-clustering-optimized.py"
+      - source: "./02-tcga-expression-clustering.py"
+      - source: "./99-debug-volume-access.py"
       - source: "./config.json"
       - source: "./etl_pipelines/**/*.py"
 

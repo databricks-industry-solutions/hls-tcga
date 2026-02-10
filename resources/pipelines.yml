@@ -56,10 +56,6 @@ resources:
       # Photon acceleration
       photon: true
 
-      # Storage location for pipeline metadata and checkpoints
-      # For Unity Catalog, let UC manage storage automatically
-      # storage: "/mnt/dlt/${bundle.target}/tcga_pipeline"
-
       # Notifications (optional - uncomment and add your email)
       # notifications:
       #   - alerts:

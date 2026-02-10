@@ -16,9 +16,21 @@ from pyspark.sql.functions import col, current_timestamp, count, when, isnan
 
 # Load configuration from DLT pipeline settings
 # These are set in pipelines.yml configuration section
-CATALOG = spark.conf.get("catalog")
-SCHEMA = spark.conf.get("schema")
-VOLUME = spark.conf.get("volume")
+# Use default values if not set (should not happen in production)
+CATALOG = spark.conf.get("catalog", None)
+SCHEMA = spark.conf.get("schema", None)
+VOLUME = spark.conf.get("volume", None)
+
+# Validate configuration was loaded
+if not CATALOG or not SCHEMA or not VOLUME:
+    raise ValueError(
+        f"DLT Pipeline configuration not loaded correctly!\n"
+        f"  catalog: {CATALOG}\n"
+        f"  schema: {SCHEMA}\n"
+        f"  volume: {VOLUME}\n"
+        f"Check pipelines.yml configuration section."
+    )
+
 VOLUME_PATH = f'/Volumes/{CATALOG}/{SCHEMA}/{VOLUME}'
 
 print(f"DLT Pipeline Configuration:")
@@ -26,6 +38,16 @@ print(f"  Catalog: {CATALOG}")
 print(f"  Schema: {SCHEMA}")
 print(f"  Volume: {VOLUME}")
 print(f"  Volume Path: {VOLUME_PATH}")
+
+# Verify the volume path is accessible (this will fail early if there's an issue)
+try:
+    # Try to list the volume to ensure it's accessible
+    dbutils.fs.ls(VOLUME_PATH)
+    print(f"✓ Volume path is accessible")
+except Exception as e:
+    print(f"✗ Cannot access volume path: {e}")
+    print(f"  This suggests a permission or configuration issue")
+    raise
 
 # Data quality thresholds
 MIN_FILE_SIZE = 1000  # bytes

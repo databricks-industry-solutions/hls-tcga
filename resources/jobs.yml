@@ -62,7 +62,7 @@ resources:
           job_cluster_key: "download_cluster"
           notebook_task:
             notebook_path: ../00-load-config.py
-          timeout_seconds: 300
+          timeout_seconds: 900  # 15 minutes (includes cluster startup time)
 
         # Task 2: Download data from GDC (uses single node with 64 cores)
         # Reads configuration from Delta table

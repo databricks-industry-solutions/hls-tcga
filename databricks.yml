@@ -59,15 +59,15 @@ artifacts:
   notebooks:
     path: .
     files:
-      - source: "./*.ipynb"
+      - source: "./00-setup.ipynb"
       - source: "./00-load-config.py"
       - source: "./01-data-download.py"
       - source: "./02-tcga-expression-clustering-optimized.py"
-      - source: "./02-tcga-expression-clustering.py"
-      - source: "./99-debug-volume-access.py"
+      - source: "./03-create-bronze-layer.py"
       - source: "./config.json"
-      - source: "./etl_pipelines/transformations/data_ingestion.py"
       - source: "./etl_pipelines/transformations/transform.py"
+      - source: "./utils/__init__.py"
+      - source: "./utils/config_loader.py"
 
 # Target: Development environment (production/staging can be added later)
 targets:

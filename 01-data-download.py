@@ -30,8 +30,19 @@ from urllib3.util.retry import Retry
 
 # COMMAND ----------
 
+# Add artifacts directory to Python path for module imports
+import sys
+# Get current notebook path and construct artifacts path
+notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+# Extract bundle root (go up from artifacts/.internal/notebook to artifacts/.internal)
+artifacts_path = '/'.join(notebook_path.split('/')[:-1])
+if artifacts_path not in sys.path:
+    sys.path.insert(0, artifacts_path)
+
+# COMMAND ----------
+
 # Import configuration utilities
-from utils.config_loader import ConfigLoader
+from config_loader import ConfigLoader
 
 # COMMAND ----------
 
@@ -448,11 +459,3 @@ else:
 # MAGIC - Expression files metadata
 # MAGIC - Clinical cases data
 # MAGIC - Gene expression profiles
-# MAGIC
-# MAGIC Next steps:
-# MAGIC - Run the DLT pipeline to create managed tables from the raw files
-# MAGIC - Perform quality checks and validation
-# MAGIC - Run analysis notebooks
-
-# COMMAND ----------
-

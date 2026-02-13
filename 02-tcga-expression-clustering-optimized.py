@@ -45,8 +45,14 @@ from pyspark.sql.functions import (
 )
 from pyspark.sql import Window
 
+# Add artifacts directory to Python path for module imports
+notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+artifacts_path = '/'.join(notebook_path.split('/')[:-1])
+if artifacts_path not in sys.path:
+    sys.path.insert(0, artifacts_path)
+
 # Import configuration utilities
-from utils.config_loader import ConfigLoader
+from config_loader import ConfigLoader
 
 # Import MLflow for experiment tracking
 import mlflow
@@ -65,9 +71,11 @@ print("✓ All libraries imported successfully")
 # Create widgets for catalog and schema (passed from job)
 dbutils.widgets.text("catalog", "kermany", "Catalog")
 dbutils.widgets.text("schema", "tcga", "Schema")
+dbutils.widgets.text("user_email", "default@databricks.com", "User Email")
 
 catalog = dbutils.widgets.get("catalog")
 schema = dbutils.widgets.get("schema")
+user_email_param = dbutils.widgets.get("user_email")
 
 if not catalog or not schema:
     raise ValueError("catalog and schema parameters must be provided")
@@ -124,9 +132,19 @@ print(f"  Clusters: {N_CLUSTERS}")
 print(f"  Use Sample: {USE_SAMPLE}")
 
 # Get user ID for table naming
-user_id = spark.sql('SELECT session_user() AS user').select(
-    expr("regexp_replace(split(user, '@')[0], '\\\.', '_') AS user_id")
-).collect()[0]['user_id']
+# Get user_id using current_user() (most reliable in job contexts)
+try:
+    current_user = spark.sql("SELECT current_user()").first()[0]
+    if current_user and current_user != "None":
+        user_id = current_user.split('@')[0].replace('.', '_')
+    else:
+        user_id = "default_user"
+except:
+    # Fallback to widget parameter if current_user() fails
+    if user_email_param and user_email_param != "default@databricks.com":
+        user_id = user_email_param.split('@')[0].replace('.', '_')
+    else:
+        user_id = "default_user"
 
 # Display configuration
 print("="*70)
@@ -152,7 +170,8 @@ print("="*70)
 # COMMAND ----------
 
 # Set up MLflow experiment
-experiment_name = f"/Users/{user_id}/tcga-expression-clustering"
+# Use Unity Catalog experiment path
+experiment_name = f"/Shared/{catalog}_{schema}_tcga_expression_clustering"
 mlflow.set_experiment(experiment_name)
 
 # Start MLflow run

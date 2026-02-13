@@ -3,9 +3,9 @@
 
 resources:
   jobs:
-    # Complete TCGA data pipeline workflow
+    # One-time initial TCGA data pipeline workflow (includes full DLT pipeline)
     tcga_data_workflow:
-      name: "[${bundle.target}] TCGA Data Workflow"
+      name: "[${bundle.target}] TCGA Data Workflow - Initial Setup"
 
       # Job clusters optimized for specific workloads
       job_clusters:
@@ -23,6 +23,8 @@ resources:
             custom_tags:
               ResourceClass: "SingleNode"
             data_security_mode: "USER_ISOLATION"
+            aws_attributes:
+              availability: "ON_DEMAND"
 
         # Memory-optimized cluster for ETL processing
         - job_cluster_key: "etl_cluster"
@@ -39,6 +41,8 @@ resources:
               spark.sql.adaptive.enabled: "true"
               spark.sql.adaptive.coalescePartitions.enabled: "true"
             data_security_mode: "USER_ISOLATION"
+            aws_attributes:
+              availability: "ON_DEMAND"
 
         # Analysis cluster for ML workloads
         - job_cluster_key: "analysis_cluster"
@@ -47,11 +51,13 @@ resources:
               min_workers: 2
               max_workers: 6
             node_type_id: "${var.analysis_node_type}"  # r5d.xlarge: 4 vCPUs, 32 GB RAM
-            spark_version: "14.3.x-cpu-ml-scala2.12"
+            spark_version: "15.4.x-cpu-ml-scala2.12"
             spark_conf:
               spark.databricks.delta.preview.enabled: "true"
               spark.sql.adaptive.enabled: "true"
-            data_security_mode: "USER_ISOLATION"
+            data_security_mode: "SINGLE_USER"
+            aws_attributes:
+              availability: "ON_DEMAND"
 
       # Job tasks
       tasks:
@@ -61,7 +67,7 @@ resources:
         - task_key: "load_config"
           job_cluster_key: "download_cluster"
           notebook_task:
-            notebook_path: ../00-load-config.py
+            notebook_path: ${workspace.root_path}/artifacts/.internal/00-load-config
           timeout_seconds: 900  # 15 minutes (includes cluster startup time)
 
         # Task 2: Download data from GDC (uses single node with 64 cores)
@@ -71,7 +77,7 @@ resources:
             - task_key: "load_config"
           job_cluster_key: "download_cluster"
           notebook_task:
-            notebook_path: ../01-data-download.py
+            notebook_path: ${workspace.root_path}/artifacts/.internal/01-data-download
             base_parameters:
               catalog: "${var.catalog_name}"
               schema: "${var.schema_name}"
@@ -79,22 +85,38 @@ resources:
           max_retries: 2
           retry_on_timeout: true
 
-        # Task 3: Run DLT pipeline (uses its own cluster config from pipelines.yml)
-        - task_key: "run_dlt_pipeline"
+        # Task 3: Create bronze layer (raw Delta tables, no transformations)
+        - task_key: "create_bronze_layer"
           depends_on:
             - task_key: "download_data"
+          job_cluster_key: "download_cluster"
+          notebook_task:
+            notebook_path: ${workspace.root_path}/artifacts/.internal/03-create-bronze-layer
+            base_parameters:
+              catalog: "${var.catalog_name}"
+              schema: "${var.schema_name}"
+              volume: "${var.volume_name}"
+          timeout_seconds: 7200  # 2 hours
+
+        # Task 4: Run DLT pipeline for transformation (silver/gold layers)
+        - task_key: "etl_pipeline"
+          depends_on:
+            - task_key: "create_bronze_layer"
           pipeline_task:
             pipeline_id: "${resources.pipelines.tcga_etl_pipeline.id}"
-            full_refresh: false
+            full_refresh: true  # Full refresh for initial setup
 
-        # Task 4: Run expression clustering analysis
+        # Task 5: Run expression clustering analysis
         - task_key: "expression_clustering"
           depends_on:
-            - task_key: "run_dlt_pipeline"
+            - task_key: "etl_pipeline"
           job_cluster_key: "analysis_cluster"
           notebook_task:
-            notebook_path: ../02-tcga-expression-clustering-optimized.py
+            notebook_path: ${workspace.root_path}/artifacts/.internal/02-tcga-expression-clustering-optimized
             base_parameters:
+              catalog: "${var.catalog_name}"
+              schema: "${var.schema_name}"
+              user_email: "${var.user_name}"
               n_top_genes: "1000"
               n_pca_components: "50"
               use_sample: "false"
@@ -115,9 +137,9 @@ resources:
       # Format
       format: MULTI_TASK
 
-    # Incremental data refresh job (for periodic updates)
+    # Incremental data refresh job (runs after initial setup for ongoing updates)
     tcga_incremental_refresh:
-      name: "[${bundle.target}] TCGA Incremental Refresh"
+      name: "[${bundle.target}] TCGA Incremental Refresh - Ongoing Updates"
 
       job_clusters:
         # Single node for incremental download
@@ -132,13 +154,15 @@ resources:
             custom_tags:
               ResourceClass: "SingleNode"
             data_security_mode: "USER_ISOLATION"
+            aws_attributes:
+              availability: "ON_DEMAND"
 
       tasks:
         # Download only new data
         - task_key: "download_new_data"
           job_cluster_key: "refresh_download_cluster"
           notebook_task:
-            notebook_path: ../01-data-download.py
+            notebook_path: ${workspace.root_path}/artifacts/.internal/01-data-download
             base_parameters:
               force_download: "false"
               max_workers: "32"

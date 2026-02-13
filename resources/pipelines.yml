@@ -10,29 +10,19 @@ resources:
       run_as:
         user_name: "${var.user_name}"
 
-      # Target schema for tables
-      target: "${var.catalog_name}.${var.schema_name}"
+      # Unity Catalog for serverless
+      catalog: "${var.catalog_name}"
+
+      # Target schema for tables (just schema name when catalog is specified)
+      target: "${var.schema_name}"
 
       # Libraries (DLT Python files)
       libraries:
         - file:
-            path: ../etl_pipelines/transformations/data_ingestion.py
-        - file:
-            path: ../etl_pipelines/transformations/transform.py
+            path: ${workspace.root_path}/artifacts/.internal/transform.py
 
-      # Cluster configuration (memory-optimized for ETL)
-      clusters:
-        - label: "default"
-          autoscale:
-            min_workers: 2
-            max_workers: 8
-            mode: ENHANCED
-          node_type_id: "${var.etl_node_type}"  # r5.2xlarge: 8 vCPUs, 64 GB RAM
-          spark_conf:
-            spark.databricks.delta.optimizeWrite.enabled: "true"
-            spark.databricks.delta.autoCompact.enabled: "true"
-            spark.sql.adaptive.enabled: "true"
-            spark.sql.adaptive.coalescePartitions.enabled: "true"
+      # Use serverless compute (Unity Catalog enabled by default)
+      serverless: true
 
       # Pipeline configuration
       configuration:

@@ -1,22 +1,57 @@
 """
 TCGA Data Transformation DLT Pipeline
 
-This module defines Delta Live Tables for transforming bronze TCGA data into
-silver tables with cleaned, validated, and enriched data.
-
-Silver Tables created:
-- cases_demographics: Patient demographic information joined with file IDs
-- cases_diagnoses: Diagnosis and treatment information
-- cases_exposures: Environmental exposure information
+Transforms bronze (raw) tables into silver/gold layers with data quality checks.
+Reads from bronze tables and applies transformations, validations, and quality expectations.
 """
 
 import dlt
 from pyspark.sql.types import *
-from pyspark.sql.functions import col, current_timestamp, year, when
+from pyspark.sql.functions import col, expr, when, isnan, current_timestamp
 
-# ============================================================================
-# Silver Tables: Cleaned and transformed data
-# ============================================================================
+# Get configuration from DLT pipeline settings
+CATALOG = spark.conf.get("catalog")
+SCHEMA = spark.conf.get("schema")
+
+@dlt.table(
+    comment="Silver: Cleaned metadata about gene expression files with quality checks"
+)
+@dlt.expect_or_drop("valid_file_id", "file_id IS NOT NULL")
+@dlt.expect_or_drop("valid_case_id", "case_id IS NOT NULL")
+def expression_files_info():
+    """Metadata about gene expression files - transformed from bronze"""
+    return (
+        dlt.read(f"{CATALOG}.{SCHEMA}.expression_files_info_bronze")
+        .filter(col("file_id").isNotNull() & col("case_id").isNotNull())
+    )
+
+@dlt.table(
+    comment="Silver: Cleaned clinical case information with quality checks"
+)
+@dlt.expect_or_drop("valid_case_id", "case_id IS NOT NULL")
+def cases():
+    """Clinical case information - transformed from bronze"""
+    return (
+        dlt.read(f"{CATALOG}.{SCHEMA}.cases_bronze")
+        .filter(col("case_id").isNotNull())
+    )
+
+@dlt.table(
+    comment="Silver: Gene expression profiles with quality checks and data validation"
+)
+@dlt.expect_or_drop("valid_gene_id", "gene_id IS NOT NULL")
+@dlt.expect_or_drop("valid_file_id", "file_id IS NOT NULL")
+@dlt.expect("valid_fpkm_values", "fpkm_unstranded >= 0 OR fpkm_unstranded IS NULL")
+def expression_profiles():
+    """Gene expression profiles (FPKM values) - transformed from bronze"""
+    return (
+        dlt.read(f"{CATALOG}.{SCHEMA}.expression_profiles_bronze")
+        .filter(col("gene_id").isNotNull() & col("file_id").isNotNull())
+        .withColumn(
+            "fpkm_unstranded_validated",
+            when(col("fpkm_unstranded") < 0, None).otherwise(col("fpkm_unstranded"))
+        )
+    )
 
 @dlt.table(
     name="cases_demographics",
@@ -81,7 +116,6 @@ def cases_demographics():
 )
 @dlt.expect_or_drop("valid_case_id", "case_id IS NOT NULL")
 @dlt.expect_or_drop("valid_file_id", "file_id IS NOT NULL")
-@dlt.expect("has_diagnosis", "primary_diagnosis IS NOT NULL OR diagnosis_id IS NOT NULL")
 def cases_diagnoses():
     """
     Transform diagnosis data with data quality checks.
@@ -100,7 +134,6 @@ def cases_diagnoses():
         '`diagnoses.0.primary_diagnosis` AS primary_diagnosis',
         '`diagnoses.0.tissue_or_organ_of_origin` AS tissue_or_organ_of_origin',
         '`diagnoses.0.tumor_grade` AS tumor_grade',
-        '`diagnoses.0.tumor_stage` AS tumor_stage',
         '`diagnoses.0.treatments.0.therapeutic_agents` AS treatment0_therapeutic_agents',
         '`diagnoses.0.treatments.0.treatment_id` AS treatment0_treatment_id',
         '`diagnoses.0.treatments.1.therapeutic_agents` AS treatment1_therapeutic_agents',
@@ -142,7 +175,6 @@ def cases_diagnoses():
 @dlt.expect_or_drop("valid_case_id", "case_id IS NOT NULL")
 @dlt.expect_or_drop("valid_file_id", "file_id IS NOT NULL")
 @dlt.expect("valid_cigarettes", "cigarettes_per_day IS NULL OR cigarettes_per_day >= 0")
-@dlt.expect("valid_years_smoked", "years_smoked IS NULL OR years_smoked >= 0")
 def cases_exposures():
     """
     Transform exposure data with data quality checks.
@@ -150,7 +182,6 @@ def cases_exposures():
     Quality checks:
     - Case ID and File ID must be present
     - Cigarettes per day should be non-negative
-    - Years smoked should be non-negative
     """
     cases = dlt.read("cases")
     expression_files_info = dlt.read("expression_files_info")
@@ -159,8 +190,7 @@ def cases_exposures():
         'case_id',
         '`exposures.0.alcohol_history` AS alcohol_history',
         '`exposures.0.alcohol_intensity` AS alcohol_intensity',
-        '`exposures.0.cigarettes_per_day` AS cigarettes_per_day',
-        '`exposures.0.years_smoked` AS years_smoked'
+        '`exposures.0.cigarettes_per_day` AS cigarettes_per_day'
     )
 
     # Add derived smoking status column

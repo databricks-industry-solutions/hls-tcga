@@ -1,109 +1,193 @@
 # TCGA ETL Pipelines
 
-This directory contains Delta Live Tables (DLT) pipelines for ingesting and transforming TCGA data.
+This directory contains the Delta Live Tables (DLT) pipeline for transforming TCGA data from bronze to silver layers.
 
-## Pipeline Structure
+## Pipeline Architecture
 
-### Bronze Layer: Raw Data Ingestion (`transformations/data_ingestion.py`)
-- `expression_files_info`: Metadata about gene expression files from GDC API
-- `cases`: Clinical case information (demographics, diagnoses, exposures)
-- `expression_profiles`: Gene expression data (FPKM values) from all samples
+### Bronze Layer (Non-DLT)
+Created by `03-create-bronze-layer.py`:
+- `expression_files_info_bronze`: Raw file metadata
+- `cases_bronze`: Raw clinical case information
+- `expression_profiles_bronze`: Raw gene expression data
 
-### Silver Layer: Cleaned and Transformed Data (`transformations/transform.py`)
-- `cases_demographics`: Patient demographic information with quality checks
-- `cases_diagnoses`: Diagnosis and treatment information with derived columns
-- `cases_exposures`: Environmental exposure information with smoking status
+### Silver Layer (DLT: `transformations/transform.py`)
+Transforms bronze tables with data quality checks:
+
+**Core Tables:**
+- `expression_files_info`: File metadata with validation
+- `cases`: Clinical case information
+- `expression_profiles`: Gene expression with FPKM validation
+
+**Clinical Tables:**
+- `cases_demographics`: Patient demographics with vital status
+- `cases_diagnoses`: Tumor classification and treatments
+- `cases_exposures`: Environmental exposures with derived smoking status
 
 ## Data Quality Expectations
 
-Each table includes data quality expectations using DLT's `@dlt.expect` decorators:
+Each table includes DLT expectations:
 
-- **Validation expectations**: Log warnings when data doesn't meet criteria
-- **Drop expectations**: Drop records that don't meet critical criteria (e.g., missing IDs)
+### Validation (`@dlt.expect`)
+Logs warnings but keeps records:
+```python
+@dlt.expect("valid_fpkm_values", "fpkm_unstranded >= 0 OR fpkm_unstranded IS NULL")
+```
+
+### Drop (`@dlt.expect_or_drop`)
+Drops invalid records:
+```python
+@dlt.expect_or_drop("valid_case_id", "case_id IS NOT NULL")
+@dlt.expect_or_drop("valid_file_id", "file_id IS NOT NULL")
+```
 
 ## Running the Pipeline
 
-### Using Databricks CLI
+### Using deploy.py (Recommended)
 
 ```bash
-# Create the pipeline
-databricks pipelines create \
-  --name "TCGA Data Pipeline" \
-  --storage "/path/to/storage" \
-  --target "your_catalog.tcga" \
-  --notebook-libraries '[{"notebook": {"path": "/path/to/data_ingestion.py"}}, {"notebook": {"path": "/path/to/transform.py"}}]'
+python deploy.py --run
+```
 
-# Start the pipeline
+### Using Databricks Bundle
+
+```bash
+databricks bundle deploy
+databricks bundle run tcga_data_workflow
+```
+
+### Manual DLT Execution
+
+The DLT pipeline runs automatically as part of the main workflow, or manually:
+
+```bash
+# Get pipeline ID
+databricks pipelines list | grep "TCGA ETL Pipeline"
+
+# Start pipeline
 databricks pipelines start --pipeline-id <pipeline-id>
 ```
 
-### Using Databricks UI
-
-1. Go to **Workflows** > **Delta Live Tables**
-2. Click **Create Pipeline**
-3. Configure:
-   - **Pipeline name**: TCGA Data Pipeline
-   - **Product edition**: Advanced
-   - **Notebook libraries**: Add both `data_ingestion.py` and `transform.py`
-   - **Target schema**: `<catalog>.tcga`
-   - **Storage location**: Choose appropriate location
-4. Click **Create**
-5. Click **Start** to run the pipeline
-
 ## Configuration
 
-The pipeline reads configuration from `config.json` in the project root:
+### Serverless DLT
+- **Compute**: Serverless (Unity Catalog enabled)
+- **Target**: `{catalog}.{schema}` from config.json
+- **Edition**: Advanced (includes expectations)
+- **Mode**: Batch (not continuous)
 
-```json
-{
-  "lakehouse": {
-    "catalog": "your_catalog",
-    "schema": "tcga",
-    "volume": "tcga_files"
-  }
-}
-```
+### Quality Checks
+
+**All Tables:**
+- Non-null case_id and file_id
+- Transformation timestamps
+
+**Specific Validations:**
+- Gender: 'male', 'female', or NULL
+- Year of birth: 1900-2020 or NULL
+- Cigarettes per day: >= 0 or NULL
+- FPKM values: >= 0 or NULL
 
 ## Features
 
 ### Change Data Feed (CDF)
-All tables have Change Data Feed enabled for tracking changes over time.
+All silver tables have CDF enabled:
+```python
+table_properties={
+    "delta.enableChangeDataFeed": "true"
+}
+```
 
-### Auto Optimization
-Z-ordering is configured on key columns for improved query performance:
-- `expression_files_info`: `file_id`, `case_id`
-- `cases`: `case_id`
-- `expression_profiles`: `file_id`, `gene_id`
-- `cases_demographics`: `case_id`, `file_id`
-- `cases_diagnoses`: `case_id`, `file_id`, `tissue_or_organ_of_origin`
-- `cases_exposures`: `case_id`, `file_id`
+### Auto-Optimization
+Z-ordering on key columns:
+```python
+table_properties={
+    "pipelines.autoOptimize.zOrderCols": "case_id,file_id"
+}
+```
 
-### Monitoring
+### Derived Columns
 
-DLT provides built-in monitoring dashboards showing:
+**cases_demographics:**
+- `is_deceased`: Boolean based on year_of_death
+
+**cases_diagnoses:**
+- `has_treatment`: Boolean based on treatment IDs
+
+**cases_exposures:**
+- `smoking_status`: Categorized (Current/Former Smoker, Non-Smoker, Unknown)
+
+## Monitoring
+
+### DLT Metrics Dashboard
+Available in Databricks UI:
 - Pipeline run history and status
-- Data quality metrics
-- Row counts and data flow
-- Expectations pass/fail rates
+- Data quality metrics (expectations pass/fail)
+- Row counts and data lineage
+- Processing duration
+
+### Key Metrics to Monitor
+
+1. **Expectation Violations**: Records dropped due to quality issues
+2. **Row Counts**: Verify expected data volume
+3. **Processing Time**: Monitor for performance degradation
+4. **Error Rates**: Track pipeline failures
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Config file not found**: Ensure `config.json` exists at the project root
-2. **Volume path errors**: Verify the volume exists and is accessible
-3. **Schema mismatches**: Check that raw files match expected schema
-4. **Expectation failures**: Review DLT metrics to see which expectations are failing
+**Pipeline Fails to Start**
+- Verify serverless is enabled in workspace
+- Check Unity Catalog permissions
+- Ensure bronze tables exist
 
-### Viewing Logs
+**Table Not Found**
+- Run bronze layer first: `03-create-bronze-layer.py`
+- Verify catalog and schema names in config.json
+- Check table naming (should have `_bronze` suffix for source tables)
 
-- In Databricks UI: Navigate to the pipeline run and click on individual table updates
-- Using CLI: `databricks pipelines get --pipeline-id <id>`
+**Quality Expectation Failures**
+- Review DLT expectations metrics in UI
+- Check source data quality in bronze tables
+- Adjust expectations if legitimate data patterns exist
+
+**Performance Issues**
+- Serverless automatically scales
+- Check for data skew in large tables
+- Review Z-ordering configuration
+
+### Debugging Steps
+
+1. **Check Bronze Tables Exist:**
+   ```sql
+   SHOW TABLES IN {catalog}.{schema} LIKE '*_bronze'
+   ```
+
+2. **Verify DLT Pipeline Config:**
+   ```bash
+   databricks pipelines get <pipeline-id>
+   ```
+
+3. **Review Event Logs:**
+   - Navigate to pipeline in Databricks UI
+   - Check "Event Log" tab for detailed errors
+
+4. **Test Queries:**
+   ```sql
+   SELECT COUNT(*) FROM {catalog}.{schema}.cases_bronze;
+   SELECT COUNT(*) FROM {catalog}.{schema}.cases;
+   ```
 
 ## Next Steps
 
-After running the pipeline:
-1. Verify data quality metrics in DLT dashboard
-2. Run analysis notebooks (e.g., `02-tcga-expression-clustering.py`)
-3. Create dashboards using the silver tables
-4. Set up alerts for data quality issues
+After pipeline completion:
+1. **Verify Quality**: Review DLT metrics dashboard
+2. **Run Analysis**: Execute `02-tcga-expression-clustering-optimized.py`
+3. **Create Dashboards**: Use silver tables for visualization
+4. **Schedule Updates**: Enable incremental refresh workflow
+
+## Additional Resources
+
+- [Delta Live Tables Documentation](https://docs.databricks.com/delta-live-tables/)
+- [Data Quality Expectations](https://docs.databricks.com/delta-live-tables/expectations.html)
+- [Unity Catalog with DLT](https://docs.databricks.com/delta-live-tables/unity-catalog.html)

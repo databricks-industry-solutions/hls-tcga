@@ -1,0 +1,188 @@
+# Job definitions for TCGA project
+# Optimized for AWS with specific compute resources per workload
+
+resources:
+  jobs:
+    # One-time initial TCGA data pipeline workflow (includes full DLT pipeline)
+    tcga_data_workflow:
+      name: "[${bundle.target}] TCGA Data Workflow - Initial Setup"
+
+      # Job clusters optimized for specific workloads
+      job_clusters:
+        # Single node cluster for data download (64 cores for concurrency)
+        - job_cluster_key: "download_cluster"
+          new_cluster:
+            num_workers: 0  # Single node (driver-only)
+            node_type_id: "${var.download_node_type}"  # r5d.16xlarge: 64 vCPUs, 512 GB RAM
+            spark_version: "14.3.x-scala2.12"
+            spark_conf:
+              spark.databricks.cluster.profile: "singleNode"
+              spark.master: "local[*]"
+              spark.databricks.delta.preview.enabled: "true"
+              spark.sql.adaptive.enabled: "true"
+            custom_tags:
+              ResourceClass: "SingleNode"
+            data_security_mode: "USER_ISOLATION"
+            aws_attributes:
+              availability: "ON_DEMAND"
+
+        # Memory-optimized cluster for ETL processing
+        - job_cluster_key: "etl_cluster"
+          new_cluster:
+            autoscale:
+              min_workers: 2
+              max_workers: 8
+            node_type_id: "${var.etl_node_type}"  # r5.2xlarge: 8 vCPUs, 64 GB RAM per node
+            spark_version: "14.3.x-scala2.12"
+            spark_conf:
+              spark.databricks.delta.preview.enabled: "true"
+              spark.databricks.delta.optimizeWrite.enabled: "true"
+              spark.databricks.delta.autoCompact.enabled: "true"
+              spark.sql.adaptive.enabled: "true"
+              spark.sql.adaptive.coalescePartitions.enabled: "true"
+            data_security_mode: "USER_ISOLATION"
+            aws_attributes:
+              availability: "ON_DEMAND"
+
+        # Analysis cluster for ML workloads
+        - job_cluster_key: "analysis_cluster"
+          new_cluster:
+            autoscale:
+              min_workers: 2
+              max_workers: 6
+            node_type_id: "${var.analysis_node_type}"  # r5d.xlarge: 4 vCPUs, 32 GB RAM
+            spark_version: "15.4.x-cpu-ml-scala2.12"
+            spark_conf:
+              spark.databricks.delta.preview.enabled: "true"
+              spark.sql.adaptive.enabled: "true"
+            data_security_mode: "SINGLE_USER"
+            aws_attributes:
+              availability: "ON_DEMAND"
+
+      # Job tasks
+      tasks:
+        # Task 1: Load Configuration to Delta Table
+        # This task loads config.json into a Delta table with unique ID and timestamp
+        # All subsequent tasks read configuration from this table
+        - task_key: "load_config"
+          job_cluster_key: "download_cluster"
+          notebook_task:
+            notebook_path: ${workspace.root_path}/artifacts/.internal/00-load-config
+          timeout_seconds: 900  # 15 minutes (includes cluster startup time)
+
+        # Task 2: Download data from GDC (uses single node with 64 cores)
+        # Reads configuration from Delta table
+        - task_key: "download_data"
+          depends_on:
+            - task_key: "load_config"
+          job_cluster_key: "download_cluster"
+          notebook_task:
+            notebook_path: ${workspace.root_path}/artifacts/.internal/01-data-download
+            base_parameters:
+              catalog: "${var.catalog_name}"
+              schema: "${var.schema_name}"
+          timeout_seconds: 14400  # 4 hours
+          max_retries: 2
+          retry_on_timeout: true
+
+        # Task 3: Create bronze layer (raw Delta tables, no transformations)
+        - task_key: "create_bronze_layer"
+          depends_on:
+            - task_key: "download_data"
+          job_cluster_key: "download_cluster"
+          notebook_task:
+            notebook_path: ${workspace.root_path}/artifacts/.internal/03-create-bronze-layer
+            base_parameters:
+              catalog: "${var.catalog_name}"
+              schema: "${var.schema_name}"
+              volume: "${var.volume_name}"
+          timeout_seconds: 7200  # 2 hours
+
+        # Task 4: Run DLT pipeline for transformation (silver/gold layers)
+        - task_key: "etl_pipeline"
+          depends_on:
+            - task_key: "create_bronze_layer"
+          pipeline_task:
+            pipeline_id: "${resources.pipelines.tcga_etl_pipeline.id}"
+            full_refresh: true  # Full refresh for initial setup
+
+        # Task 5: Run expression clustering analysis
+        - task_key: "expression_clustering"
+          depends_on:
+            - task_key: "etl_pipeline"
+          job_cluster_key: "analysis_cluster"
+          notebook_task:
+            notebook_path: ${workspace.root_path}/artifacts/.internal/02-tcga-expression-clustering-optimized
+            base_parameters:
+              catalog: "${var.catalog_name}"
+              schema: "${var.schema_name}"
+              user_email: "${var.user_name}"
+              n_top_genes: "1000"
+              n_pca_components: "50"
+              use_sample: "false"
+          timeout_seconds: 7200  # 2 hours
+
+      # Schedule (daily at 2 AM) - starts paused
+      schedule:
+        quartz_cron_expression: "0 0 2 * * ?"
+        timezone_id: "America/Los_Angeles"
+        pause_status: "PAUSED"
+
+      # Timeout for entire job
+      timeout_seconds: 28800  # 8 hours
+
+      # Max concurrent runs
+      max_concurrent_runs: 1
+
+      # Format
+      format: MULTI_TASK
+
+    # Incremental data refresh job (runs after initial setup for ongoing updates)
+    tcga_incremental_refresh:
+      name: "[${bundle.target}] TCGA Incremental Refresh - Ongoing Updates"
+
+      job_clusters:
+        # Single node for incremental download
+        - job_cluster_key: "refresh_download_cluster"
+          new_cluster:
+            num_workers: 0  # Single node
+            node_type_id: "${var.download_node_type}"
+            spark_version: "14.3.x-scala2.12"
+            spark_conf:
+              spark.databricks.cluster.profile: "singleNode"
+              spark.master: "local[*]"
+            custom_tags:
+              ResourceClass: "SingleNode"
+            data_security_mode: "USER_ISOLATION"
+            aws_attributes:
+              availability: "ON_DEMAND"
+
+      tasks:
+        # Download only new data
+        - task_key: "download_new_data"
+          job_cluster_key: "refresh_download_cluster"
+          notebook_task:
+            notebook_path: ${workspace.root_path}/artifacts/.internal/01-data-download
+            base_parameters:
+              force_download: "false"
+              max_workers: "32"
+              max_records: "5000"
+          timeout_seconds: 3600
+
+        # Incremental DLT pipeline refresh
+        - task_key: "incremental_pipeline_refresh"
+          depends_on:
+            - task_key: "download_new_data"
+          pipeline_task:
+            pipeline_id: "${resources.pipelines.tcga_etl_pipeline.id}"
+            full_refresh: false
+
+      # Schedule (weekly on Sunday at 3 AM)
+      schedule:
+        quartz_cron_expression: "0 0 3 ? * SUN"
+        timezone_id: "America/Los_Angeles"
+        pause_status: "PAUSED"
+
+      timeout_seconds: 7200  # 2 hours
+      max_concurrent_runs: 1
+      format: MULTI_TASK

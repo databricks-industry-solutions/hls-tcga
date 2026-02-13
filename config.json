@@ -1,6 +1,6 @@
 {
   "lakehouse": {
-    "catalog": "db_omics_solacc",
+    "catalog": "kermany",
     "schema": "tcga",
     "volume": "tcga_files"
   },
@@ -8,5 +8,21 @@
     "cases_endpt": "https://api.gdc.cancer.gov/cases",
     "files_endpt": "https://api.gdc.cancer.gov/files",
     "data_endpt": "https://api.gdc.cancer.gov/data/"
+  },
+  "pipeline": {
+    "max_workers": 64,
+    "max_records": 2000,
+    "force_download": false,
+    "retry_attempts": 3,
+    "timeout_seconds": 900
+  },
+  "compute": {
+    "download_node_type": "m5d.16xlarge",
+    "etl_node_type": "r5d.2xlarge",
+    "analysis_node_type": "r5d.xlarge"
+  },
+  "deployment": {
+    "profile": "HLS",
+    "cloud": "aws"
   }
 }

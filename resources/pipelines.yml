@@ -1,0 +1,62 @@
+# DLT Pipeline definitions for TCGA project
+
+resources:
+  pipelines:
+    # Main TCGA data ingestion and transformation pipeline
+    tcga_etl_pipeline:
+      name: "[${bundle.target}] TCGA ETL Pipeline"
+
+      # Run as the deploying user to inherit their permissions
+      run_as:
+        user_name: "${var.user_name}"
+
+      # Unity Catalog for serverless
+      catalog: "${var.catalog_name}"
+
+      # Target schema for tables (just schema name when catalog is specified)
+      target: "${var.schema_name}"
+
+      # Libraries (DLT Python files)
+      libraries:
+        - file:
+            path: ${workspace.root_path}/artifacts/.internal/transform.py
+
+      # Use serverless compute (Unity Catalog enabled by default)
+      serverless: true
+
+      # Pipeline configuration
+      configuration:
+        catalog: "${var.catalog_name}"
+        schema: "${var.schema_name}"
+        volume: "${var.volume_name}"
+        pipelines.applyChangesPreviewEnabled: "true"
+
+      # Development mode settings (controlled by target variable)
+      development: ${var.pipeline_development_mode}
+
+      # Continuous execution (disabled by default, enable for streaming)
+      continuous: false
+
+      # Channel (preview or current)
+      channel: "CURRENT"
+
+      # Edition (core, pro, advanced)
+      edition: "ADVANCED"
+
+      # Photon acceleration
+      photon: true
+
+      # Notifications (optional - uncomment and add your email)
+      # notifications:
+      #   - alerts:
+      #       - "on-update-failure"
+      #       - "on-update-fatal-failure"
+      #     email_recipients:
+      #       - "your-email@company.com"
+
+      # Permissions (uncomment if groups exist)
+      # permissions:
+      #   - level: CAN_MANAGE
+      #     group_name: "data-engineering"
+      #   - level: CAN_VIEW
+      #     group_name: "data-analysts"

@@ -17,252 +17,445 @@
 
 # COMMAND ----------
 
-# MAGIC %run ./00-setup
+# Import required libraries
+import os
+import json
+import logging
+import requests
+import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Tuple, Optional, Dict, Any
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # COMMAND ----------
 
-FORCE_DOWNLOAD=False
+# Add artifacts directory to Python path for module imports
+import sys
+# Get current notebook path and construct artifacts path
+notebook_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+# Extract bundle root (go up from artifacts/.internal/notebook to artifacts/.internal)
+artifacts_path = '/'.join(notebook_path.split('/')[:-1])
+if artifacts_path not in sys.path:
+    sys.path.insert(0, artifacts_path)
+
+# COMMAND ----------
+
+# Import configuration utilities
+from config_loader import ConfigLoader
+
+# COMMAND ----------
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Define Functions
+# MAGIC ## Load Configuration from Delta Table
 
 # COMMAND ----------
 
-def download_table(end_point, fields, output_file, size=100000, filters=None):
-        resource = end_point.split('/')[-1]
-        
-        if resource == 'files':
-            if filters:
-                _filters = [{'op': f"{m[1]}", 'content': {'field': f"{m[0]}", 'value': m[2]}} for m in filters]
-                api_filter = {
-                    "op": "and",
-                    "content": _filters
-                }
-            else:
-                api_filter = None
-        else:
-            if filters:
-                _filters = [{'op': f"{m[1]}", 'content': {'field': f"{m[0]}", 'value': m[2]}} for m in filters]
-                api_filter = {
-                    "op": "and",
-                    "content": _filters
-                }
-            else:
-                api_filter = None
+# Create widgets for catalog and schema (passed from job)
+dbutils.widgets.text("catalog", "kermany", "Catalog")
+dbutils.widgets.text("schema", "tcga", "Schema")
 
-        fields = ','.join(fields)
+catalog = dbutils.widgets.get("catalog")
+schema = dbutils.widgets.get("schema")
+
+if not catalog or not schema:
+    raise ValueError("catalog and schema parameters must be provided")
+
+logger.info(f"Loading configuration from {catalog}.{schema}.pipeline_config...")
+
+# Load configuration from Delta table
+config_loader = ConfigLoader(spark, catalog, schema)
+config = config_loader.get_active_config()
+
+logger.info(f"✓ Loaded configuration ID: {config['config_id']}")
+logger.info(f"✓ Timestamp: {config['config_timestamp']}")
+
+# Extract configuration values
+volume_path = config['volume_path']
+database_name = config['database_name']
+cases_endpt = config['cases_endpt']
+files_endpt = config['files_endpt']
+data_endpt = config['data_endpt']
+
+# Pipeline parameters (can be overridden by job parameters)
+MAX_WORKERS = config['max_workers']
+MAX_RECORDS = config['max_records']
+FORCE_DOWNLOAD = config['force_download']
+RETRY_ATTEMPTS = config['retry_attempts']
+TIMEOUT_SECONDS = config['timeout_seconds']
+
+logger.info(f"Configuration: MAX_WORKERS={MAX_WORKERS}, MAX_RECORDS={MAX_RECORDS}, FORCE_DOWNLOAD={FORCE_DOWNLOAD}")
+logger.info(f"Volume path: {volume_path}")
+logger.info(f"Database: {database_name}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Define Helper Functions
+
+# COMMAND ----------
+
+def get_requests_session() -> requests.Session:
+    """
+    Create a requests session with retry logic and connection pooling.
+
+    Returns:
+        requests.Session: Configured session with retry logic
+    """
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET", "POST"]
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=100, pool_maxsize=100)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+# COMMAND ----------
+
+def download_table(
+    end_point: str,
+    fields: List[str],
+    output_path: str,
+    size: int = 100000,
+    filters: Optional[List[Tuple]] = None
+) -> None:
+    """
+    Download data from GDC API endpoint and save to Unity Catalog volume.
+
+    Args:
+        end_point: GDC API endpoint URL
+        fields: List of fields to retrieve
+        output_path: Volume path to save the downloaded file
+        size: Maximum number of records to retrieve
+        filters: Optional list of filters as (field, operator, value) tuples
+
+    Raises:
+        requests.exceptions.RequestException: If API request fails
+    """
+    try:
+        logger.info(f"Downloading data from {end_point}")
+
+        # Build API filter
+        api_filter = None
+        if filters:
+            _filters = [
+                {'op': str(m[1]), 'content': {'field': str(m[0]), 'value': m[2]}}
+                for m in filters
+            ]
+            api_filter = {"op": "and", "content": _filters}
+
+        # Prepare request parameters
         params = {
             "filters": api_filter,
-            "fields": fields,
+            "fields": ','.join(fields),
             "format": "TSV",
             "size": size
         }
-        
-        response = requests.post(end_point, json=params)
-        with open(output_file, 'w') as f:
-            f.write(response.content.decode("utf-8"))
+
+        # Make API request with retry logic
+        session = get_requests_session()
+        response = session.post(end_point, json=params, timeout=300)
+        response.raise_for_status()
+
+        # Write to volume using dbutils
+        content = response.content.decode("utf-8")
+        dbutils.fs.put(output_path, content, overwrite=True)
+
+        logger.info(f"Successfully downloaded data to {output_path}")
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to download data from {end_point}: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during download: {str(e)}")
+        raise
 
 # COMMAND ----------
 
-from concurrent.futures import ThreadPoolExecutor
 def download_single_expression(
-    uuid,
-    target_directory_path
-):
-    local_filename = f"{target_directory_path}/{uuid}"
-    url = f'{data_endpt}{uuid}'
-    with open(local_filename, 'w') as f:
-        f.write(
-            requests.get(url).content.decode("utf-8")
-        )
+    uuid: str,
+    target_directory_path: str,
+    session: requests.Session
+) -> Tuple[str, bool, Optional[str]]:
+    """
+    Download a single gene expression file.
+
+    Args:
+        uuid: File UUID to download
+        target_directory_path: Volume directory path
+        session: Requests session with retry logic
+
+    Returns:
+        Tuple of (uuid, success_flag, error_message)
+    """
+    try:
+        file_path = f"{target_directory_path}/{uuid}"
+        url = f'{data_endpt}{uuid}'
+
+        response = session.get(url, timeout=60)
+        response.raise_for_status()
+
+        content = response.content.decode("utf-8")
+        dbutils.fs.put(file_path, content, overwrite=True)
+
+        return (uuid, True, None)
+    except Exception as e:
+        error_msg = f"Failed to download {uuid}: {str(e)}"
+        logger.warning(error_msg)
+        return (uuid, False, error_msg)
 
 def download_expressions(
-    target_directory_path,
-    uuids,
-    n_workers=64
-):
-    params = [
-        (uid, target_directory_path)
-        for uid in uuids
-    ]
-    with ThreadPoolExecutor(
-        max_workers=n_workers
-    ) as executor:
-        executor.map(
-            lambda pair: download_single_expression(*pair),
-            params
-        )
+    target_directory_path: str,
+    uuids: List[str],
+    n_workers: int = 64
+) -> Dict[str, Any]:
+    """
+    Download multiple gene expression files in parallel.
+
+    Args:
+        target_directory_path: Volume directory path
+        uuids: List of file UUIDs to download
+        n_workers: Number of concurrent workers
+
+    Returns:
+        Dictionary with download statistics
+    """
+    logger.info(f"Starting download of {len(uuids)} expression files with {n_workers} workers")
+
+    session = get_requests_session()
+    successful = 0
+    failed = 0
+    errors = []
+
+    with ThreadPoolExecutor(max_workers=n_workers) as executor:
+        futures = {
+            executor.submit(download_single_expression, uuid, target_directory_path, session): uuid
+            for uuid in uuids
+        }
+
+        for future in as_completed(futures):
+            uuid, success, error = future.result()
+            if success:
+                successful += 1
+                if successful % 100 == 0:
+                    logger.info(f"Progress: {successful}/{len(uuids)} files downloaded")
+            else:
+                failed += 1
+                errors.append(error)
+
+    logger.info(f"Download complete: {successful} successful, {failed} failed")
+
+    return {
+        "total": len(uuids),
+        "successful": successful,
+        "failed": failed,
+        "errors": errors
+    }
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 1. Download data from GDC
+# MAGIC ## 1. Download Expression Files Metadata
 
 # COMMAND ----------
 
-FORCE_DOWNLOAD=False
-
-# COMMAND ----------
-
-# DBTITLE 1,download files list
-import pandas as pd
-import os
-import logging
-import requests
-
+# DBTITLE 1,Download files list
 file_fields = [
-  "access",
-  "data_format",
-  "data_type",
-  "file_id",
-  "cases.project.project_id",
-  "data_category",
-  "experimental_strategy",
-  "file_id",
-  "file_name",
-  "file_size",
-  "type",
-  "cases.case_id"
+    "access",
+    "data_format",
+    "data_type",
+    "file_id",
+    "cases.project.project_id",
+    "data_category",
+    "experimental_strategy",
+    "file_name",
+    "file_size",
+    "type",
+    "cases.case_id"
 ]
 
 files_filters = [
-  ('data_format','in',['TSV']),
-  ('data_type','in',['Gene Expression Quantification']),
-  ('cases.project.program.name','in',['TCGA']),
-  ('access','in',['open'])
-  ]
+    ('data_format', 'in', ['TSV']),
+    ('data_type', 'in', ['Gene Expression Quantification']),
+    ('cases.project.program.name', 'in', ['TCGA']),
+    ('access', 'in', ['open'])
+]
 
-path = f"{volume_path}/expressions_info.tsv"
-_flag = not os.path.isfile(path) or FORCE_DOWNLOAD
+expressions_info_path = f"{volume_path}/expressions_info.tsv"
 
-if _flag:
-  logging.info(f'file {path} does not exist. Downloading expressions_info.tsv')
-  download_table(files_endpt,file_fields,path,size=20000,filters=files_filters)
+# Check if file exists using dbutils
+try:
+    file_exists = len(dbutils.fs.ls(expressions_info_path)) > 0
+except Exception:
+    file_exists = False
+
+if not file_exists or FORCE_DOWNLOAD:
+    logger.info(f'Downloading expressions_info.tsv to {expressions_info_path}')
+    download_table(
+        files_endpt,
+        file_fields,
+        expressions_info_path,
+        size=MAX_RECORDS,
+        filters=files_filters
+    )
 else:
-  logging.info(f'file {path} already exists')
+    logger.info(f'File {expressions_info_path} already exists')
 
-files_list_pdf=pd.read_csv(path,sep='\t')
-print(f'downloaded {files_list_pdf.shape[0]} records')
-files_list_pdf.head()
+# Read using Spark for better performance
+files_list_df = spark.read.csv(expressions_info_path, sep='\t', header=True, inferSchema=True)
+record_count = files_list_df.count()
+logger.info(f'Loaded {record_count} expression file records')
+display(files_list_df.limit(10))
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Download Cases
+# MAGIC ## 2. Download Clinical Cases Data
 
 # COMMAND ----------
 
+# DBTITLE 1,Download cases with clinical metadata
 demographic_fields = [
-  "demographic.ethnicity",
-  "demographic.gender",
-  "demographic.race",
-  "demographic.year_of_birth",
-  "demographic.year_of_death"
+    "demographic.ethnicity",
+    "demographic.gender",
+    "demographic.race",
+    "demographic.year_of_birth",
+    "demographic.year_of_death"
 ]
 
 diagnoses_fields = [
-  "diagnoses.classification_of_tumor",
-  "diagnoses.diagnosis_id",
-  "diagnoses.primary_diagnosis",
-  "diagnoses.tissue_or_organ_of_origin",
-  "diagnoses.tumor_grade",
-  "diagnoses.tumor_stage",
-  "diagnoses.treatments.therapeutic_agents",
-  "diagnoses.treatments.treatment_id",
-  "diagnoses.treatments.updated_datetime"
+    "diagnoses.classification_of_tumor",
+    "diagnoses.diagnosis_id",
+    "diagnoses.primary_diagnosis",
+    "diagnoses.tissue_or_organ_of_origin",
+    "diagnoses.tumor_grade",
+    "diagnoses.tumor_stage",
+    "diagnoses.treatments.therapeutic_agents",
+    "diagnoses.treatments.treatment_id",
+    "diagnoses.treatments.updated_datetime"
 ]
 
 exposures_fields = [
-"exposures.alcohol_history",
-"exposures.alcohol_intensity",
-"exposures.bmi",
-"exposures.cigarettes_per_day",
-"exposures.height",
-"exposures.updated_datetime",
-"exposures.weight",
-"exposures.years_smoked"]
+    "exposures.alcohol_history",
+    "exposures.alcohol_intensity",
+    "exposures.bmi",
+    "exposures.cigarettes_per_day",
+    "exposures.height",
+    "exposures.updated_datetime",
+    "exposures.weight",
+    "exposures.years_smoked"
+]
 
-fields = ['case_id']+demographic_fields+diagnoses_fields+exposures_fields
+fields = ['case_id'] + demographic_fields + diagnoses_fields + exposures_fields
 
 cases_filters = [
-  ('cases.project.program.name','in',['TCGA']),
+    ('cases.project.program.name', 'in', ['TCGA']),
 ]
 
-path = f"{volume_path}/cases.tsv"
-download_table(cases_endpt,fields,path,size=100000,filters=cases_filters)
+cases_path = f"{volume_path}/cases.tsv"
 
-df=spark.read.csv(path,sep='\t',header=True)
-print(f"n_records in cases is {df.count()}")
-display(df)
+# Check if file exists
+try:
+    cases_exists = len(dbutils.fs.ls(cases_path)) > 0
+except Exception:
+    cases_exists = False
 
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Download Expressions
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC Now we use the list of the files to download expression profiles. Note that we are downloading ~11000 files and this can take some time (even with 32 cores concurrently). 
-
-# COMMAND ----------
-
-EXPRESSION_FILES_PATH=f"{volume_path}/expressions"
-dbutils.fs.mkdirs(EXPRESSION_FILES_PATH)
-uuids=files_list_pdf.file_id.to_list()
-download_expressions(EXPRESSION_FILES_PATH,uuids)
-
-
-# COMMAND ----------
-
-# DBTITLE 1,download cases
-demographic_fields = [
-  "demographic.ethnicity",
-  "demographic.gender",
-  "demographic.race",
-  "demographic.year_of_birth",
-  "demographic.year_of_death"
-]
-
-diagnoses_fields = [
-  "diagnoses.classification_of_tumor",
-  "diagnoses.diagnosis_id",
-  "diagnoses.primary_diagnosis",
-  "diagnoses.tissue_or_organ_of_origin",
-  "diagnoses.tumor_grade",
-  "diagnoses.tumor_stage",
-  "diagnoses.treatments.therapeutic_agents",
-  "diagnoses.treatments.treatment_id",
-  "diagnoses.treatments.updated_datetime"
-]
-
-exposures_fields = [
-"exposures.alcohol_history",
-"exposures.alcohol_intensity",
-"exposures.bmi",
-"exposures.cigarettes_per_day",
-"exposures.height",
-"exposures.updated_datetime",
-"exposures.weight",
-"exposures.years_smoked"]
-
-fields = ['case_id']+demographic_fields+diagnoses_fields+exposures_fields
-
-cases_filters = [
-  ('cases.project.program.name','in',['TCGA']),
-]
-
-path = f"{STAGING_PATH}/cases.tsv"
-_flag = not os.path.isfile(path) or FORCE_DOWNLOAD
-
-if _flag:
-  logging.info(f'file {path} does not exist. Downloading cases.tsv')
-  download_table(cases_endpt,fields,path,size=100000,filters=cases_filters)
+if not cases_exists or FORCE_DOWNLOAD:
+    logger.info(f'Downloading cases data to {cases_path}')
+    download_table(
+        cases_endpt,
+        fields,
+        cases_path,
+        size=100000,
+        filters=cases_filters
+    )
 else:
-  logging.info(f'file {path} already exists')
+    logger.info(f'File {cases_path} already exists')
 
-df=spark.read.csv(path,sep='\t',header=True)
-print(f"n_records in cases is {df.count()}")
-display(df)
+# Read and validate cases data
+cases_df = spark.read.csv(cases_path, sep='\t', header=True, inferSchema=True)
+case_count = cases_df.count()
+logger.info(f"Loaded {case_count} case records")
+display(cases_df.limit(10))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 3. Download Gene Expression Files
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Download individual gene expression profiles. This will download thousands of files and may take some time, even with concurrent downloads enabled.
+
+# COMMAND ----------
+
+# DBTITLE 1,Download expression files
+EXPRESSION_FILES_PATH = f"{volume_path}/expressions"
+
+# Create directory if it doesn't exist
+try:
+    dbutils.fs.mkdirs(EXPRESSION_FILES_PATH)
+    logger.info(f"Expression files directory: {EXPRESSION_FILES_PATH}")
+except Exception as e:
+    logger.warning(f"Directory may already exist: {str(e)}")
+
+# Get list of UUIDs to download
+uuids = [row.file_id for row in files_list_df.select("file_id").collect()]
+logger.info(f"Total files to download: {len(uuids)}")
+
+# Check for existing files to skip if not forcing download
+if not FORCE_DOWNLOAD:
+    try:
+        existing_files = {file.name for file in dbutils.fs.ls(EXPRESSION_FILES_PATH)}
+        uuids_to_download = [uuid for uuid in uuids if uuid not in existing_files]
+        logger.info(f"Found {len(existing_files)} existing files, will download {len(uuids_to_download)} new files")
+        uuids = uuids_to_download
+    except Exception:
+        logger.info("No existing files found, will download all")
+
+# Download expressions with progress tracking
+if uuids:
+    download_stats = download_expressions(
+        EXPRESSION_FILES_PATH,
+        uuids,
+        n_workers=MAX_WORKERS
+    )
+
+    # Display download statistics
+    print("\n" + "="*50)
+    print("Download Summary:")
+    print("="*50)
+    print(f"Total files: {download_stats['total']}")
+    print(f"Successful: {download_stats['successful']}")
+    print(f"Failed: {download_stats['failed']}")
+    if download_stats['errors']:
+        print(f"\nFirst 10 errors:")
+        for error in download_stats['errors'][:10]:
+            print(f"  - {error}")
+    print("="*50)
+else:
+    logger.info("All expression files already downloaded")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 4. Data Download Complete
+# MAGIC
+# MAGIC The following data has been downloaded to the Unity Catalog volume:
+# MAGIC - Expression files metadata
+# MAGIC - Clinical cases data
+# MAGIC - Gene expression profiles

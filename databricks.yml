@@ -1,0 +1,106 @@
+# Databricks Asset Bundle configuration for TCGA project
+# This file defines resources and deployment settings for the TCGA data pipeline
+#
+# IMPORTANT: Run 00-setup.ipynb first to generate config.json with your settings
+
+bundle:
+  name: tcga-pipeline
+
+include:
+  - resources/*.yml
+
+# Variables with sensible defaults
+# These will be overridden by values from config.json during deployment
+variables:
+  catalog_name:
+    description: Unity Catalog name
+    default: "kermany"
+
+  schema_name:
+    description: Schema name within the catalog
+    default: "tcga"
+
+  volume_name:
+    description: Volume name for raw data storage
+    default: "tcga_files"
+
+  user_name:
+    description: Databricks username (for run_as permissions)
+    default: "amir.kermany@databricks.com"
+
+  # Compute configuration for AWS
+  download_node_type:
+    description: Single node type for data download (64 cores for concurrency)
+    default: "r5d.16xlarge"  # 64 vCPUs, 512 GB RAM
+
+  etl_node_type:
+    description: Node type for ETL cluster (memory optimized)
+    default: "r5d.2xlarge"  # 8 vCPUs, 64 GB RAM, local NVMe SSD
+
+  analysis_node_type:
+    description: Node type for analysis cluster
+    default: "r5d.xlarge"  # 4 vCPUs, 32 GB RAM
+
+  # Pipeline parameters
+  max_workers:
+    description: Maximum concurrent download workers
+    default: 64
+
+  pipeline_development_mode:
+    description: Enable DLT development mode
+    default: true
+
+# Workspace configuration
+# Host is automatically determined from your Databricks CLI profile
+workspace: {}
+
+# Artifacts to sync to workspace
+artifacts:
+  notebooks:
+    path: .
+    files:
+      - source: "./00-setup.ipynb"
+      - source: "./00-load-config.py"
+      - source: "./01-data-download.py"
+      - source: "./02-tcga-expression-clustering-optimized.py"
+      - source: "./03-create-bronze-layer.py"
+      - source: "./config.json"
+      - source: "./etl_pipelines/transformations/transform.py"
+      - source: "./utils/__init__.py"
+      - source: "./utils/config_loader.py"
+
+# Target: Development environment (production/staging can be added later)
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      root_path: ~/.bundle/${bundle.name}/${bundle.target}
+      profile: HLS
+    variables:
+      # These defaults work for most setups
+      # Override via --var flag if needed: databricks bundle deploy --var="catalog_name=my_catalog"
+      pipeline_development_mode: true
+
+# Note: Staging and production targets commented out for now
+# Uncomment and configure when ready for multi-environment deployment
+#
+#  staging:
+#    mode: production
+#    workspace:
+#      root_path: /Shared/.bundle/${bundle.name}/${bundle.target}
+#    variables:
+#      catalog_name: "staging_catalog"
+#      schema_name: "tcga_staging"
+#      volume_name: "tcga_files_staging"
+#      pipeline_development_mode: false
+#
+#  prod:
+#    mode: production
+#    workspace:
+#      root_path: /Shared/.bundle/${bundle.name}/${bundle.target}
+#    variables:
+#      catalog_name: "prod_catalog"
+#      schema_name: "tcga"
+#      volume_name: "tcga_files"
+#      pipeline_development_mode: false

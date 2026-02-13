@@ -2,42 +2,214 @@
 
 <img src="https://www.cancer.gov/ccg/sites/g/files/xnrzdm256/files/styles/cgov_featured/public/cgov_image/media_image/2022-06/TCGA%20people%20and%20layers%20of%20data%20425x319.jpg?h=982f41e1&itok=zkQ_l8-t" width=500 >
 
+[The Cancer Genome Atlas (TCGA)](https://www.cancer.gov/ccg/research/genome-sequencing/tcga) is a comprehensive initiative to understand the molecular foundations of cancer through genome analysis. TCGA contains over 2.5 petabytes of genomic data spanning 33 cancer types from over 10,000 patients.
 
-[The Cancer Genome Atlas (TCGA)](https://www.cancer.gov/ccg/research/genome-sequencing/tcga) represents a comprehensive and coordinated initiative aimed at expediting our understanding of the molecular foundations of cancer by leveraging genome analysis technologies, including large-scale genome sequencing. Spearheaded in 2006 by the [National Cancer Institute (NCI)](https://www.nih.gov/about-nih/what-we-do/nih-almanac/national-cancer-institute-nci) and [National Human Genome Research Institute (NHGRI)](https://www.genome.gov/), TCGA has set forth the following objectives:
+## Quick Start
 
-1. Enhance our capacity for cancer diagnosis, treatment, and prevention by delving into the genomic alterations in cancer, which will pave the way for more refined diagnostic and therapeutic strategies.
-2. Pinpoint molecular therapy targets by discerning common molecular traits of tumors, enabling the development of treatments that specifically target these markers.
-3. Uncover carcinogenesis mechanisms by identifying the genomic shifts that lead to the transition of normal cells into tumors.
-4. Strengthen predictions of cancer recurrence by understanding the genomic modifications in tumors, facilitating the recognition of indicators that signify an increased likelihood of cancer resurgence post-treatment.
-5. Foster new breakthroughs via data sharing. TCGA has adopted a policy of sharing all its data and findings with the global scientific fraternity, promoting independent research, novel discoveries, and the development of improved solutions.
+### Recommended: One-Command Deployment
 
-TCGA boasts over 2.5 petabytes of genomic, epigenomic, transcriptomic, and proteomic data spanning 33 cancer types. Contributions from over 10,000 patients include tumor samples and matched controls from blood or nearby normal tissues. The Genomic Data Commons offers complete access to this data, and users can visually navigate it using the Integrated Genomics Viewer.
+```bash
+# Clone the repository
+git clone <repository-url>
+cd hls-tcga
 
-TCGA serves as a comprehensive repository of pivotal genomic variations in major cancers, continually propelling significant advancements in cancer biology comprehension. It illuminates the mechanisms underlying tumorigenesis and sets the stage for the next generation of diagnostic and therapeutic methods.
+# Run the deployment script (interactive setup)
+python deploy.py
 
-## Workflow Overview
-Within this solution accelerator, we present a template illustrating the ease with which one can load RNA expression profiles from [TCGA](https://portal.gdc.cancer.gov/) and associated clinical data into the Databricks platform, and subsequently perform diverse analyses on the dataset. Specifically, we demonstrate how to construct a database of gene expression profiles combined with pertinent metadata and manage all data assets, including raw files, using [Unity Catalog (UC)](https://www.databricks.com/product/unity-catalog). Below is an outline of the workflow:
+# Or deploy and run immediately
+python deploy.py --run
+```
 
-- Modify [config.json](./config.json) file if needed to customize your catalog
-- Run [setup](./00-setup) notebook to create the catalog, schema and associated volume to store raw data
-- Initially, RNA expression profiles and clinical metadata can be downloaded using the [01-data-download](./01-data-download) notebook. This notebook uses [GDC APIs](https://gdc.cancer.gov/access-data/gdc-data-transfer-tool) to download and store the data into a [managed volume](https://docs.databricks.com/en/data-governance/unity-catalog/create-volumes.html), a Unity Catalog-governed storage volume housed in the schema's default storage location.
+The `deploy.py` script will:
+- Auto-detect your Databricks workspace and cloud provider
+- Prompt for configuration with intelligent defaults
+- Create Unity Catalog resources (catalog, schema, volume)
+- Deploy the complete pipeline to your workspace
+- Optionally run the workflow immediately
 
-- Subsequently, in the [etl_pipelines](./etl_pipelines), we create tables from raw data using [Lakeflow ETL](https://www.databricks.com/product/data-engineering/lakeflow-declarative-pipelines) pipelines.
+### Alternative: Direct Bundle Deployment
 
-- As an example of using databricks data intelligence [02-tcga-expression-clsutering](./02-tcga-expression-clsutering), we use dimensionality reduction and clustering to investigate relationships between RNA expression profiles and meta data such as tissue or oragn of origin. Most of this notebook is created by using [Databricks Data Science Agent](https://www.databricks.com/blog/introducing-databricks-assistant-data-science-agent). 
+```bash
+# Configure Databricks CLI
+databricks configure --token
 
-### Workflow
+# Create configuration
+python deploy.py --config-only
 
-#### Data Download
-We use the following enedpoints to download open access data:
+# Deploy to development
+databricks bundle deploy
 
-cases_endpt: https://api.gdc.cancer.gov/cases
+# Run the workflow
+databricks bundle run tcga_data_workflow
+```
 
-files_endpt: https://api.gdc.cancer.gov/files
+## Architecture
 
-data_endpt:  https://api.gdc.cancer.gov/data
+### Medallion Data Pipeline
 
-#### ETL
-After landing the files in a managed volume, we transform the data into the following tables:
+```
+Bronze (Raw) → Silver (Transformed) → Gold (Analytics)
+```
 
-[![](https://mermaid.ink/img/pako:eNqFk1Fr2zAQx7-K0Ah-SUe2tWz1wyB1lFHoYCxbKdjDKNY5FdiSkeTRUvLde7YjW04f6gdb-v9_p9PJuhdaaAE0povFS6YIkUq6mPRDQiL3CDVEMYn23EK0DNV7biTfV2CjEUerMbLm5jnRlTZd3IfLz9fXbOVDJ-IPPLmJKsvyLXKjjQAzQV-TFT4BV0kFk726_HJ1tQlsC4VWYrabb-tkvd0GjAPj5Ay5WbNP2yQaiGP3wddxscjUwfDmkdz9Hizb7gfhb0LOlHtdtTXYQU3SAs_OklLiWf0bNJbCU2PAWqnVYJAaHBfccU_8CpHG6DAclBgGZ3l3Bf4Y7vOeEvsFw5x5v1ouValHO0yYnyXc3KZC8oPSwXoPHa9tayaKpQJq3e9FFl79cbdLD6Agr-A_VHmQxDruPLVDyvK6qd7hxtL7walScnHxHes9baybMeaPsfewuhFG-iNKm1tf-HzuffYw9_18jGdn8cxnYF1SlLDwuYA10iWtwdRcCuy4vmsy2ndTRmMcCih5W7mM4o1DtG3wRgAT0mlDY2daWFLeOr17VgWNS15Z8NAGf4_h9ahCH_RzaO2-w4-vPW4yHw?type=png)](https://mermaid.live/edit#pako:eNqFk1Fr2zAQx7-K0Ah-SUe2tWz1wyB1lFHoYCxbKdjDKNY5FdiSkeTRUvLde7YjW04f6gdb-v9_p9PJuhdaaAE0povFS6YIkUq6mPRDQiL3CDVEMYn23EK0DNV7biTfV2CjEUerMbLm5jnRlTZd3IfLz9fXbOVDJ-IPPLmJKsvyLXKjjQAzQV-TFT4BV0kFk726_HJ1tQlsC4VWYrabb-tkvd0GjAPj5Ay5WbNP2yQaiGP3wddxscjUwfDmkdz9Hizb7gfhb0LOlHtdtTXYQU3SAs_OklLiWf0bNJbCU2PAWqnVYJAaHBfccU_8CpHG6DAclBgGZ3l3Bf4Y7vOeEvsFw5x5v1ouValHO0yYnyXc3KZC8oPSwXoPHa9tayaKpQJq3e9FFl79cbdLD6Agr-A_VHmQxDruPLVDyvK6qd7hxtL7walScnHxHes9baybMeaPsfewuhFG-iNKm1tf-HzuffYw9_18jGdn8cxnYF1SlLDwuYA10iWtwdRcCuy4vmsy2ndTRmMcCih5W7mM4o1DtG3wRgAT0mlDY2daWFLeOr17VgWNS15Z8NAGf4_h9ahCH_RzaO2-w4-vPW4yHw)
+**Bronze Layer** - Raw data ingestion
+- Creates raw Delta tables from GDC API downloads
+- Stores data in Unity Catalog volumes
+- No transformations or quality checks
+
+**Silver Layer** - Delta Live Tables (DLT) with quality checks
+- `expression_files_info`: File metadata with validation
+- `cases`: Clinical case information
+- `expression_profiles`: Gene expression data with FPKM validation
+- `cases_demographics`: Patient demographics with vital status
+- `cases_diagnoses`: Tumor classification and treatments
+- `cases_exposures`: Environmental factors (smoking, alcohol)
+
+**Gold Layer** - ML Analysis
+- PCA and t-SNE dimensionality reduction
+- K-means clustering with MLflow tracking
+- Interactive Plotly visualizations
+
+### Workflow Components
+
+1. **Configuration** (`00-setup.ipynb`, `config.json`)
+   - Unity Catalog setup
+   - Environment-specific configuration
+
+2. **Data Download** (`01-data-download.py`)
+   - Fetches data from [GDC APIs](https://gdc.cancer.gov/access-data/gdc-data-transfer-tool)
+   - Parallel downloads (64 concurrent workers)
+   - Stores in Unity Catalog volumes
+
+3. **Bronze Layer** (`03-create-bronze-layer.py`)
+   - Creates raw Delta tables from downloaded files
+   - No transformations or quality checks
+
+4. **Silver Layer** (`etl_pipelines/transformations/transform.py`)
+   - Delta Live Tables with data quality expectations
+   - Transforms bronze tables into clean silver tables
+   - Auto-optimization with Z-ordering and Change Data Feed
+
+5. **Analysis** (`02-tcga-expression-clustering-optimized.py`)
+   - Memory-efficient processing
+   - MLflow experiment tracking
+   - Interactive visualizations
+
+## Project Structure
+
+```
+hls-tcga/
+├── databricks.yml                    # Bundle configuration
+├── config.json                       # Runtime configuration
+├── deploy.py                         # Interactive deployment script
+├── resources/
+│   ├── pipelines.yml                # DLT pipeline definitions
+│   └── jobs.yml                     # Job workflow definitions
+├── etl_pipelines/
+│   └── transformations/
+│       └── transform.py             # DLT silver layer transformations
+├── utils/
+│   ├── config_loader.py            # Configuration utilities
+│   └── __init__.py
+├── 00-setup.ipynb                   # Setup notebook
+├── 00-load-config.py               # Config loader for jobs
+├── 01-data-download.py             # Data download
+├── 02-tcga-expression-clustering-optimized.py  # ML analysis
+├── 03-create-bronze-layer.py       # Bronze layer creation
+└── tcga_dashboard.lvdash.json      # Lakeview dashboard
+```
+
+## Key Features
+
+### Production-Ready
+- **Serverless DLT**: Unity Catalog enabled, no cluster management
+- **On-Demand Instances**: No spot termination issues
+- **Data Quality**: DLT expectations for validation
+- **MLflow Integration**: Experiment tracking for reproducibility
+- **Medallion Architecture**: Bronze → Silver → Gold layers
+
+### Scalable & Efficient
+- **Parallel Downloads**: 64 concurrent workers
+- **Memory Optimization**: Validates data size before pandas conversion
+- **Delta Lake**: ACID transactions, time travel, Change Data Feed
+- **Auto-Optimization**: Z-ordering for query performance
+
+### Developer-Friendly
+- **One-Command Deploy**: `python deploy.py`
+- **Environment Management**: Dev/staging/prod configurations
+- **Comprehensive Logging**: Progress tracking and error reporting
+- **Widget Parameters**: Runtime configuration without code changes
+
+## Data Pipeline Details
+
+### GDC API Endpoints
+
+```
+Cases:  https://api.gdc.cancer.gov/cases
+Files:  https://api.gdc.cancer.gov/files
+Data:   https://api.gdc.cancer.gov/data
+```
+
+### Tables Created
+
+**Bronze** (raw):
+- `expression_files_info_bronze`
+- `cases_bronze`
+- `expression_profiles_bronze`
+
+**Silver** (cleaned & validated):
+- `expression_files_info`
+- `cases`
+- `expression_profiles`
+- `cases_demographics`
+- `cases_diagnoses`
+- `cases_exposures`
+
+**Gold** (analytics):
+- `{user}_expression_profiles_pivoted`
+- `{user}_expression_dimensionality_results`
+- `{user}_expression_clustering_final`
+
+## Configuration
+
+### Runtime Parameters
+
+Configurable via Databricks widgets:
+- `catalog`: Unity Catalog name (default: "kermany")
+- `schema`: Schema name (default: "tcga")
+- `volume`: Volume name (default: "tcga_files")
+- `max_workers`: Concurrent downloads (default: 64)
+- `force_download`: Re-download existing files (default: false)
+- `n_top_genes`: Variable genes for analysis (default: 1000)
+- `n_pca_components`: PCA dimensions (default: 50)
+
+### Environment Variables
+
+```bash
+# Override defaults
+export TCGA_CATALOG=my_catalog
+export TCGA_SCHEMA=my_schema
+export TCGA_MAX_WORKERS=128
+```
+
+## Documentation
+
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)**: Deployment guide
+- **[resources/README.md](./resources/README.md)**: Bundle configuration
+- **[etl_pipelines/README.md](./etl_pipelines/README.md)**: DLT pipeline details
+- **[utils/README.md](./utils/README.md)**: Utility functions
+
+## Requirements
+
+- Databricks workspace (AWS or Azure)
+- Unity Catalog enabled
+- Databricks CLI configured
+- Python 3.8+
+
+## License
+
+Part of Databricks Solution Accelerators.
+
+## Acknowledgments
+
+- Data from [The Cancer Genome Atlas (TCGA)](https://www.cancer.gov/ccg/research/genome-sequencing/tcga)
+- APIs from [Genomic Data Commons (GDC)](https://gdc.cancer.gov/)

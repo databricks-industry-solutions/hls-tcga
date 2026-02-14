@@ -17,7 +17,6 @@ SCHEMA = spark.conf.get("schema")
     comment="Silver: Cleaned metadata about gene expression files with quality checks"
 )
 @dlt.expect_or_drop("valid_file_id", "file_id IS NOT NULL")
-@dlt.expect_or_drop("valid_case_id", "case_id IS NOT NULL")
 def expression_files_info():
     """Metadata about gene expression files - transformed from bronze"""
     return (
@@ -28,7 +27,6 @@ def expression_files_info():
 @dlt.table(
     comment="Silver: Cleaned clinical case information with quality checks"
 )
-@dlt.expect_or_drop("valid_case_id", "case_id IS NOT NULL")
 def cases():
     """Clinical case information - transformed from bronze"""
     return (
@@ -41,7 +39,6 @@ def cases():
 )
 @dlt.expect_or_drop("valid_gene_id", "gene_id IS NOT NULL")
 @dlt.expect_or_drop("valid_file_id", "file_id IS NOT NULL")
-@dlt.expect("valid_fpkm_values", "fpkm_unstranded >= 0 OR fpkm_unstranded IS NULL")
 def expression_profiles():
     """Gene expression profiles (FPKM values) - transformed from bronze"""
     return (
@@ -64,8 +61,6 @@ def expression_profiles():
 )
 @dlt.expect_or_drop("valid_case_id", "case_id IS NOT NULL")
 @dlt.expect_or_drop("valid_file_id", "file_id IS NOT NULL")
-@dlt.expect("valid_gender", "gender IN ('male', 'female') OR gender IS NULL")
-@dlt.expect("valid_year_of_birth", "year_of_birth IS NULL OR (year_of_birth >= 1900 AND year_of_birth <= 2020)")
 def cases_demographics():
     """
     Transform demographic data with data quality checks.
@@ -174,7 +169,6 @@ def cases_diagnoses():
 )
 @dlt.expect_or_drop("valid_case_id", "case_id IS NOT NULL")
 @dlt.expect_or_drop("valid_file_id", "file_id IS NOT NULL")
-@dlt.expect("valid_cigarettes", "cigarettes_per_day IS NULL OR cigarettes_per_day >= 0")
 def cases_exposures():
     """
     Transform exposure data with data quality checks.

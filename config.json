@@ -17,6 +17,7 @@
     "timeout_seconds": 900
   },
   "compute": {
+    "use_serverless": false,
     "download_node_type": "m5d.16xlarge",
     "etl_node_type": "r5d.2xlarge",
     "analysis_node_type": "r5d.xlarge"

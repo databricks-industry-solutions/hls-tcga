@@ -10,10 +10,11 @@ This script handles the complete deployment workflow for the TCGA data pipeline:
 5. Optionally runs the deployed workflow
 
 Usage:
-    python deploy.py                    # Interactive setup and deploy
-    python deploy.py --run              # Deploy and run immediately
-    python deploy.py --config-only      # Only create config.json
-    python deploy.py --deploy-only      # Deploy without running
+    python deploy.py                         # Interactive setup and deploy
+    python deploy.py --run                   # Deploy and run immediately
+    python deploy.py --run --serverless      # Deploy+run using serverless compute
+    python deploy.py --config-only           # Only create config.json
+    python deploy.py --deploy-only           # Deploy without running
 """
 
 import json
@@ -261,31 +262,45 @@ def collect_configuration(existing_config: Optional[Dict[str, Any]] = None) -> D
     print("\n" + Colors.BOLD + "Compute Configuration" + Colors.ENDC)
     print_info(f"Configure instance types for {cloud_display}")
 
-    use_defaults = prompt_yes_no(
-        f"  Use default {cloud_display} instance types?",
-        default=True
+    use_serverless = prompt_yes_no(
+        "  Use serverless compute for notebook tasks (skips cluster provisioning)?",
+        default=bool(compute.get('use_serverless', False))
     )
 
-    if use_defaults:
-        default_types = get_default_instance_types(cloud)
-        download_node = default_types['download_node_type']
-        etl_node = default_types['etl_node_type']
-        analysis_node = default_types['analysis_node_type']
+    default_types = get_default_instance_types(cloud)
+
+    if use_serverless:
+        # Node types are not used on serverless, but keep them in config so toggling
+        # back to classic compute doesn't require re-prompting.
+        download_node = compute.get('download_node_type', default_types['download_node_type'])
+        etl_node = compute.get('etl_node_type', default_types['etl_node_type'])
+        analysis_node = compute.get('analysis_node_type', default_types['analysis_node_type'])
+        print_info("Serverless selected — node type prompts skipped.")
     else:
-        download_node = prompt_with_default(
-            "  Download cluster node type (64 cores)",
-            compute.get('download_node_type', 'r5d.16xlarge')
+        use_defaults = prompt_yes_no(
+            f"  Use default {cloud_display} instance types?",
+            default=True
         )
 
-        etl_node = prompt_with_default(
-            "  ETL cluster node type (8 cores, memory optimized)",
-            compute.get('etl_node_type', 'r5d.2xlarge')
-        )
+        if use_defaults:
+            download_node = default_types['download_node_type']
+            etl_node = default_types['etl_node_type']
+            analysis_node = default_types['analysis_node_type']
+        else:
+            download_node = prompt_with_default(
+                "  Download cluster node type (64 cores)",
+                compute.get('download_node_type', 'r5d.16xlarge')
+            )
 
-        analysis_node = prompt_with_default(
-            "  Analysis cluster node type (4 cores)",
-            compute.get('analysis_node_type', 'r5d.xlarge')
-        )
+            etl_node = prompt_with_default(
+                "  ETL cluster node type (8 cores, memory optimized)",
+                compute.get('etl_node_type', 'r5d.2xlarge')
+            )
+
+            analysis_node = prompt_with_default(
+                "  Analysis cluster node type (4 cores)",
+                compute.get('analysis_node_type', 'r5d.xlarge')
+            )
 
     # Build configuration
     config = {
@@ -307,6 +322,7 @@ def collect_configuration(existing_config: Optional[Dict[str, Any]] = None) -> D
             "timeout_seconds": 300
         },
         "compute": {
+            "use_serverless": use_serverless,
             "download_node_type": download_node,
             "etl_node_type": etl_node,
             "analysis_node_type": analysis_node
@@ -505,6 +521,10 @@ def deploy_bundle(config: Dict[str, Any], repo_root: Path) -> bool:
 
         print_success(f"DLT pipeline will run as: {username}")
 
+        # Select bundle target based on compute mode
+        target = get_bundle_target(config)
+        print_info(f"Bundle target: {target}")
+
         # Build var flags for deployment
         var_flags = [
             '--var', f'catalog_name={config["lakehouse"]["catalog"]}',
@@ -512,15 +532,19 @@ def deploy_bundle(config: Dict[str, Any], repo_root: Path) -> bool:
             '--var', f'volume_name={config["lakehouse"]["volume"]}',
             '--var', f'user_name={username}',
             '--var', f'max_workers={config["pipeline"]["max_workers"]}',
-            '--var', f'download_node_type={config["compute"]["download_node_type"]}',
-            '--var', f'etl_node_type={config["compute"]["etl_node_type"]}',
-            '--var', f'analysis_node_type={config["compute"]["analysis_node_type"]}'
         ]
+        # Node type vars are only relevant for classic clusters
+        if not config['compute'].get('use_serverless', False):
+            var_flags += [
+                '--var', f'download_node_type={config["compute"]["download_node_type"]}',
+                '--var', f'etl_node_type={config["compute"]["etl_node_type"]}',
+                '--var', f'analysis_node_type={config["compute"]["analysis_node_type"]}',
+            ]
 
         # Validate bundle
         print_info("Validating bundle configuration...")
         result = subprocess.run(
-            ['databricks', 'bundle', 'validate', '--target', 'dev'] + var_flags,
+            ['databricks', 'bundle', 'validate', '--target', target] + var_flags,
             cwd=repo_root,
             capture_output=True,
             text=True
@@ -536,7 +560,7 @@ def deploy_bundle(config: Dict[str, Any], repo_root: Path) -> bool:
         # Deploy bundle
         print_info("Deploying bundle to Databricks workspace...")
         result = subprocess.run(
-            ['databricks', 'bundle', 'deploy', '--target', 'dev'] + var_flags,
+            ['databricks', 'bundle', 'deploy', '--target', target] + var_flags,
             cwd=repo_root,
             capture_output=False,  # Show output in real-time
             text=True
@@ -550,7 +574,7 @@ def deploy_bundle(config: Dict[str, Any], repo_root: Path) -> bool:
 
         # Get deployment info
         result = subprocess.run(
-            ['databricks', 'bundle', 'summary', '--target', 'dev'],
+            ['databricks', 'bundle', 'summary', '--target', target],
             cwd=repo_root,
             capture_output=True,
             text=True
@@ -567,14 +591,20 @@ def deploy_bundle(config: Dict[str, Any], repo_root: Path) -> bool:
         return False
 
 
-def run_workflow(repo_root: Path) -> bool:
+def get_bundle_target(config: Dict[str, Any]) -> str:
+    """Return the bundle target name based on compute.use_serverless."""
+    return 'dev-serverless' if config.get('compute', {}).get('use_serverless', False) else 'dev'
+
+
+def run_workflow(repo_root: Path, config: Dict[str, Any]) -> bool:
     """Run the deployed workflow"""
     try:
         print_header("Running Workflow")
 
-        print_info("Starting TCGA data workflow...")
+        target = get_bundle_target(config)
+        print_info(f"Starting TCGA data workflow (target: {target})...")
         result = subprocess.run(
-            ['databricks', 'bundle', 'run', 'tcga_data_workflow', '--target', 'dev'],
+            ['databricks', 'bundle', 'run', 'tcga_data_workflow', '--target', target],
             cwd=repo_root,
             capture_output=False,  # Show output in real-time
             text=True
@@ -599,10 +629,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python deploy.py                  # Interactive setup and deploy
-  python deploy.py --run            # Deploy and run immediately
-  python deploy.py --config-only    # Only create config.json
-  python deploy.py --non-interactive # Use existing config.json (fail if not found)
+  python deploy.py                      # Interactive setup and deploy
+  python deploy.py --run                # Deploy and run immediately
+  python deploy.py --run --serverless   # Deploy+run using serverless compute
+  python deploy.py --config-only        # Only create config.json
+  python deploy.py --non-interactive    # Use existing config.json (fail if not found)
         """
     )
 
@@ -622,6 +653,13 @@ Examples:
         '--run',
         action='store_true',
         help='Deploy and run the workflow immediately'
+    )
+
+    parser.add_argument(
+        '--serverless',
+        action='store_true',
+        help='Use serverless compute for notebook tasks (skips classic cluster provisioning). '
+             'Persists compute.use_serverless=true in config.json.'
     )
 
     parser.add_argument(
@@ -675,6 +713,12 @@ Examples:
             config = collect_configuration()
             save_config(config, config_path)
 
+    # --serverless flag overrides config and persists the choice
+    if args.serverless and not config.get('compute', {}).get('use_serverless', False):
+        config.setdefault('compute', {})['use_serverless'] = True
+        save_config(config, config_path)
+        print_info("--serverless flag set: compute.use_serverless=true persisted to config.json")
+
     # Display configuration summary
     print("\n" + Colors.BOLD + "Configuration Summary:" + Colors.ENDC)
     print(f"  Catalog: {config['lakehouse']['catalog']}")
@@ -682,9 +726,15 @@ Examples:
     print(f"  Volume: {config['lakehouse']['volume']}")
     print(f"  Profile: {config['deployment']['profile']}")
     print(f"  Cloud: {config['deployment']['cloud'].upper()}")
-    print(f"  Download node: {config['compute']['download_node_type']}")
-    print(f"  ETL node: {config['compute']['etl_node_type']}")
-    print(f"  Analysis node: {config['compute']['analysis_node_type']}")
+    if config['compute'].get('use_serverless', False):
+        print(f"  Compute: {Colors.GREEN}serverless{Colors.ENDC} (bundle target: dev-serverless)")
+        print_warning("  Note: download task normally uses a 64-core single node for parallel HTTP fetches;")
+        print_warning("        on serverless, sizing is auto-selected and throughput may differ.")
+    else:
+        print(f"  Compute: classic clusters (bundle target: dev)")
+        print(f"  Download node: {config['compute']['download_node_type']}")
+        print(f"  ETL node: {config['compute']['etl_node_type']}")
+        print(f"  Analysis node: {config['compute']['analysis_node_type']}")
 
     if args.config_only:
         print_success("Configuration complete!")
@@ -710,11 +760,12 @@ Examples:
             default=True
         )
         if run_now:
-            run_workflow(repo_root)
+            run_workflow(repo_root, config)
 
     print_header("Deployment Complete!")
+    target = get_bundle_target(config)
     print_info("Next steps:")
-    print("  1. Monitor workflows: databricks bundle run tcga_data_workflow --target dev")
+    print(f"  1. Monitor workflows: databricks bundle run tcga_data_workflow --target {target}")
     print("  2. View logs in Databricks UI")
     print(f"  3. Data will be stored in: {config['lakehouse']['catalog']}.{config['lakehouse']['schema']}")
 

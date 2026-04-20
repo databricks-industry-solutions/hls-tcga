@@ -82,6 +82,38 @@ targets:
       # Override via --var flag if needed: databricks bundle deploy --var="catalog_name=my_catalog"
       pipeline_development_mode: true
 
+  # Serverless variant of dev: runs notebook tasks on serverless compute instead of
+  # classic job clusters. Selected by deploy.py when config.compute.use_serverless=true
+  # (or --serverless flag). The DLT pipeline is already serverless in pipelines.yml.
+  dev-serverless:
+    mode: development
+    workspace:
+      root_path: ~/.bundle/${bundle.name}/${bundle.target}
+      profile: HLS
+    variables:
+      pipeline_development_mode: true
+    resources:
+      jobs:
+        tcga_data_workflow:
+          # Blank job_cluster_key on each notebook task so the task runs on
+          # serverless notebook compute (Databricks auto-selects sizing).
+          # Classic job_clusters defined in resources/jobs.yml remain defined
+          # but unused — Databricks only provisions clusters actually referenced.
+          # The DLT task (etl_pipeline) is already serverless via pipelines.yml.
+          tasks:
+            - task_key: "load_config"
+              job_cluster_key: ""
+            - task_key: "download_data"
+              job_cluster_key: ""
+            - task_key: "create_bronze_layer"
+              job_cluster_key: ""
+            - task_key: "expression_clustering"
+              job_cluster_key: ""
+        tcga_incremental_refresh:
+          tasks:
+            - task_key: "download_new_data"
+              job_cluster_key: ""
+
 # Note: Staging and production targets commented out for now
 # Uncomment and configure when ready for multi-environment deployment
 #

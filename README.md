@@ -16,16 +16,28 @@ cd hls-tcga
 # Run the deployment script (interactive setup)
 python deploy.py
 
-# Or deploy and run immediately
+# Or deploy and run immediately on classic job clusters
 python deploy.py --run
+
+# Or deploy and run on serverless compute (no cluster provisioning)
+python deploy.py --run --serverless
 ```
 
 The `deploy.py` script will:
 - Auto-detect your Databricks workspace and cloud provider
-- Prompt for configuration with intelligent defaults
+- Prompt for configuration with intelligent defaults (including compute mode)
 - Create Unity Catalog resources (catalog, schema, volume)
 - Deploy the complete pipeline to your workspace
 - Optionally run the workflow immediately
+
+#### Compute modes
+
+| Mode | How to select | What happens |
+|---|---|---|
+| **Classic clusters** (default) | `python deploy.py --run` | Provisions job clusters using `compute.*_node_type` from `config.json`. Uses bundle target `dev`. |
+| **Serverless** | `python deploy.py --run --serverless` | Notebook tasks run on serverless compute; no cluster provisioning. Uses bundle target `dev-serverless`. Persists `compute.use_serverless=true` to `config.json` so subsequent `--non-interactive` runs pick it up automatically. |
+
+The DLT pipeline (silver/gold layer) is always serverless regardless of the selected mode. On serverless, the download task's 64-core single-node profile is replaced with Databricks' auto-sized serverless compute — throughput may differ.
 
 ### Alternative: Direct Bundle Deployment
 
@@ -182,6 +194,21 @@ Configurable via Databricks widgets:
 - `n_top_genes`: Variable genes for analysis (default: 1000)
 - `n_pca_components`: PCA dimensions (default: 50)
 
+### `config.json` keys
+
+The `compute` section controls cluster provisioning:
+
+```json
+"compute": {
+  "use_serverless": false,            // true = use serverless; false = classic job clusters
+  "download_node_type": "r5d.16xlarge",
+  "etl_node_type": "r5d.2xlarge",
+  "analysis_node_type": "r5d.xlarge"
+}
+```
+
+Setting `use_serverless: true` (or passing `--serverless` once) makes `deploy.py` deploy to the `dev-serverless` bundle target; node type values are ignored in that mode but preserved so toggling back is seamless.
+
 ### Environment Variables
 
 ```bash
@@ -202,7 +229,7 @@ export TCGA_MAX_WORKERS=128
 
 - Databricks workspace (AWS or Azure)
 - Unity Catalog enabled
-- Databricks CLI configured
+- Databricks CLI **v0.297+** configured (older versions fail to download Terraform due to an expired signing key)
 - Python 3.8+
 
 ## License

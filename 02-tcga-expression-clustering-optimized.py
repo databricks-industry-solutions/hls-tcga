@@ -254,8 +254,6 @@ top_genes_df = (
     .limit(N_TOP_GENES)
 )
 
-# Cache for reuse
-top_genes_df.cache()
 top_genes_list = [row['gene_id'] for row in top_genes_df.select('gene_id').collect()]
 
 # Log gene variance statistics
@@ -295,10 +293,7 @@ pivot_df = (
     .agg(first('fpkm_unstranded'))
 )
 
-# Cache the pivoted dataframe
-pivot_df.cache()
-
-# Save pivoted data as checkpoint
+# Save pivoted data as checkpoint (also materializes the pivot)
 checkpoint_table = f"{database_name}.{user_id}_expression_profiles_pivoted"
 pivot_df.write.mode('overwrite').saveAsTable(checkpoint_table)
 
